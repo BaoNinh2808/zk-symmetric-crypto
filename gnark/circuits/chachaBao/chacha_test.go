@@ -138,15 +138,12 @@ func TestCipher(t *testing.T) {
 	plaintext2 := BytesToUint32BE(bPt2)
 	ciphertext2 := BytesToUint32BE(bCt2)
 
-	data_len := 2
-
 	witness := ChaChaCircuit{}
 
 	// witness := ChaChaCircuit{}
 	copy(witness.Key[:], BytesToUint32LE(bKey))
 	copy(witness.Nonce[:], BytesToUint32LE(bNonce))
 	witness.Counter = counter
-	witness.len = data_len
 	copy(witness.Data_Keys[0][:], plaintext1)
 	copy(witness.Enc_Data_Keys[0][:], ciphertext1)
 	copy(witness.Data_Keys[1][:], plaintext2)

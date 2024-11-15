@@ -1,19 +1,18 @@
 package chacha
 
 import (
-	"fmt"
-
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/std/math/uints"
 )
+
+const num_of_data = 2
 
 type ChaChaCircuit struct {
 	Key           [8]uints.U32
 	Counter       uints.U32    `gnark:",public"`
 	Nonce         [3]uints.U32 `gnark:",public"`
-	Data_Keys     [2][16]uints.U32
-	Enc_Data_Keys [2][16]uints.U32 `gnark:",public"`
-	len           int              `gnark:",public"`
+	Data_Keys     [num_of_data][16]uints.U32
+	Enc_Data_Keys [num_of_data][16]uints.U32 `gnark:",public"`
 }
 
 func (c *ChaChaCircuit) Define(api frontend.API) error {
@@ -27,8 +26,7 @@ func (c *ChaChaCircuit) Define(api frontend.API) error {
 	uapi.AssertEq(one, uints.NewU32(1)) //constrain the one value is equal to 1
 	counter := c.Counter
 
-	for j := 0; j < 2; j++ {
-		fmt.Println("j: ", j)
+	for j := 0; j < num_of_data; j++ {
 		// Fill state. Start with constants
 		state[0] = uints.NewU32(0x61707865)
 		state[1] = uints.NewU32(0x3320646e)
