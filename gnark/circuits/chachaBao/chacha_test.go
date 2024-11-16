@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/consensys/gnark-crypto/ecc"
+	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/std/math/uints"
 	"github.com/consensys/gnark/test"
 	"golang.org/x/crypto/chacha20"
@@ -110,7 +111,7 @@ func TestCipher(t *testing.T) {
 	bNonce := []uint8{
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x4a, 0x00, 0x00, 0x00, 0x00}
 
-	counter := uints.NewU32(1)
+	counter := uints.NewU32(2)
 
 	bPt1 := make([]byte, 64)
 	rand.Read(bPt1)
@@ -119,7 +120,7 @@ func TestCipher(t *testing.T) {
 	cipher, err := chacha20.NewUnauthenticatedCipher(bKey, bNonce)
 	assert.NoError(err)
 
-	cipher.SetCounter(1)
+	cipher.SetCounter(2)
 	cipher.XORKeyStream(bCt1, bPt1)
 
 	bPt2 := make([]byte, 64)
@@ -148,6 +149,11 @@ func TestCipher(t *testing.T) {
 	copy(witness.Enc_Data_Keys[0][:], ciphertext1)
 	copy(witness.Data_Keys[1][:], plaintext2)
 	copy(witness.Enc_Data_Keys[1][:], ciphertext2)
+
+	witness.Data_Values = [2]frontend.Variable{19, 18}
+	witness.Corrsponding_Data_Index[0] = 2
+	copy(witness.Criterias_Keys[0][:], plaintext2)
+	witness.Criterias_Values[0] = 19
 
 	err = test.IsSolved(&ChaChaCircuit{}, &witness, ecc.BN254.ScalarField())
 	assert.NoError(err)
