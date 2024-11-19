@@ -91,7 +91,6 @@ func (c *ChaChaCircuit) Define(api frontend.API) error {
 		// // Check satisfy the condition
 		// Satify(comparator_api, uapi, &c.Data_Keys[index], &c.Criterias_Keys[i], &c.Data_Values[index], &c.Criterias_Values[i])
 
-		AssertHasOneBit1(api, c.Corrsponding_Data_Index[i])
 		bits := api.ToBinary(c.Corrsponding_Data_Index[i], num_of_data_pieces)
 		fmt.Printf("bits: %v\n", bits)
 
@@ -99,7 +98,7 @@ func (c *ChaChaCircuit) Define(api frontend.API) error {
 		var selectKey [16]uints.U32
 		selectValue = c.Data_Values[0]
 		selectKey = c.Data_Keys[0]
-		for j := 0; j < num_of_data_pieces; j++ { //must start from 0 because we don't constrains the value assign to selectValue and selectKey
+		for j := 1; j < num_of_data_pieces; j++ {
 			selectValue = api.Select(bits[j], c.Data_Values[j], selectValue)
 			for k := 0; k < 16; k++ {
 				for l := 0; l < 4; l++ {
@@ -125,10 +124,7 @@ func Satify(comparator_api *cmp.BoundedComparator, uapi *uints.BinaryField[uints
 	comparator_api.AssertIsLessEq(*variable1, *variable2)
 }
 
-// func Satify(comparator_api *cmp.BoundedComparator, uapi *uints.BinaryField[uints.U32], variable1 *frontend.Variable, variable2 *frontend.Variable) {
-// 	comparator_api.AssertIsLessEq(*variable1, *variable2)
-// }
-
+<<<<<<< HEAD
 func AssertHasOneBit1(api frontend.API, variable frontend.Variable) { //for each n > 0, n & (n - 1) == 0
 	comparator_api := cmp.NewBoundedComparator(api, big.NewInt(100000), false)
 	comparator_api.AssertIsLess(0, variable) //variable > 0
@@ -147,3 +143,8 @@ func AssertHasOneBit1(api frontend.API, variable frontend.Variable) { //for each
 	zero := api.FromBinary(bitsZero[:]...)
 	api.AssertIsEqual(zero, 0)
 }
+=======
+// func Satify(comparator_api *cmp.BoundedComparator, uapi *uints.BinaryField[uints.U32], variable1 *frontend.Variable, variable2 *frontend.Variable) {
+// 	comparator_api.AssertIsLessEq(*variable1, *variable2)
+// }
+>>>>>>> parent of cbbb223 (j start from 0 (because we don't constrains value assign to selectKeys and selectValues) & Assert Correspoding_Data_Index have only one bit 1)

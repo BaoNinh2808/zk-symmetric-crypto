@@ -3,14 +3,10 @@ package chacha
 import (
 	"crypto/rand"
 	"encoding/binary"
-	"fmt"
 	"testing"
-	"time"
 
 	"github.com/consensys/gnark-crypto/ecc"
-	"github.com/consensys/gnark/backend/groth16"
 	"github.com/consensys/gnark/frontend"
-	"github.com/consensys/gnark/frontend/cs/r1cs"
 	"github.com/consensys/gnark/std/math/uints"
 	"github.com/consensys/gnark/test"
 	"golang.org/x/crypto/chacha20"
@@ -163,9 +159,15 @@ func TestCipher(t *testing.T) {
 	assert.NoError(err)
 
 	assert.CheckCircuit(&ChaChaCircuit{}, test.WithValidAssignment(&witness))
+<<<<<<< HEAD
 
 	var myCircuit ChaChaCircuit
+	startCompile := time.Now()
 	r1cs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &myCircuit)
+	elapsedCompile := time.Since(startCompile)
+	fmt.Printf("Compile Time: %v\n", elapsedCompile)
+
+	fmt.Printf("Num of Constraints: %v\n", r1cs.GetNbConstraints())
 
 	assert.NoError(err)
 
@@ -186,10 +188,12 @@ func TestCipher(t *testing.T) {
 	proof, err := groth16.Prove(r1cs, pk, new_witness)
 	assert.NoError(err)
 	elapsedProof := time.Since(startProof)
-	fmt.Printf("Proof Time: %v\n", elapsedProof)
+	fmt.Printf("Proving Time: %v\n", elapsedProof)
 
 	fmt.Printf("Proof: %v\n", proof)
 	// err := groth16.Verify(proof, vk, publicWitness)
+=======
+>>>>>>> parent of cbbb223 (j start from 0 (because we don't constrains value assign to selectKeys and selectValues) & Assert Correspoding_Data_Index have only one bit 1)
 }
 
 func BytesToUint32LE(in []uint8) []uints.U32 {
