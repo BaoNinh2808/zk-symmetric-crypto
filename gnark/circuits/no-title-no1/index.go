@@ -12,8 +12,9 @@ type Index struct {
 
 // constructor of Index
 func NewIndex(api frontend.API, Row, Col uint8) Index {
-	r := uints.NewU8(Row)
-	c := uints.NewU8(Col)
+	r := BitAtPosition(Row)
+	c := BitAtPosition(Col)
+
 	AssertHasOneBit1(api, r)
 	AssertHasOneBit1(api, c)
 	return Index{
@@ -38,6 +39,8 @@ func Compare(bf *uints.BinaryField[uints.U32], api *frontend.API, a, b Index) fr
 	return (*api).Select(isEqual, 0, (*api).Select(isLess, -1, 1))
 }
 
-func IsEqualIndex(bf *uints.BinaryField[uints.U32], api *frontend.API, a, b Index) frontend.Variable {
-	return (*api).And(bf.IsEqualU8(a.Row, b.Row), bf.IsEqualU8(a.Col, b.Col))
+func IsEqualIndex(bf *uints.BinaryField[uints.U32], api *frontend.API, a, b *Index) frontend.Variable {
+	isEqualRow := bf.IsEqualU8(a.Row, b.Row)
+	isEqualCol := bf.IsEqualU8(a.Col, b.Col)
+	return (*api).And(isEqualRow, isEqualCol)
 }

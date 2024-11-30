@@ -84,12 +84,13 @@ func (c *MyCircuit) Define(api frontend.API) error {
 	}
 
 	// check correct Lenght of obj key
-	for i := 0; i < split; i += 2 {
+	for i := 0; i < split; i = i + 2 {
 		row, col := PositionToRowCol(i)
 		index := NewIndex(api, row, col)
 		total_Refs := frontend.Variable(0)
-		for j := i + 2; j < split; j += 2 {
-			isRef := IsEqualIndex(uapi, &api, index, c.Data[j].Ref_index)
+		for j := i + 2; j < split; j = j + 2 {
+			isRef := IsEqualIndex(uapi, &api, &index, &c.Data[j].Ref_index)
+			// fmt.Println("j : ", j, "isRef :", isRef)
 			total_Refs = api.Add(total_Refs, isRef)
 		}
 		api.AssertIsEqual(total_Refs, c.Data[i].Len.Val)
@@ -101,7 +102,7 @@ func (c *MyCircuit) Define(api frontend.API) error {
 		index := NewIndex(api, row, col)
 		total_Refs := frontend.Variable(0)
 		for j := split; j < n; j++ {
-			isRef := IsEqualIndex(uapi, &api, index, c.Data[j].Ref_index)
+			isRef := IsEqualIndex(uapi, &api, &index, &c.Data[j].Ref_index)
 			total_Refs = api.Add(total_Refs, isRef)
 		}
 		api.AssertIsEqual(total_Refs, c.Data[i].Len.Val)
