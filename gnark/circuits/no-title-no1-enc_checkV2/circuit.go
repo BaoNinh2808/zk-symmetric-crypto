@@ -150,7 +150,7 @@ func (c *MyCircuit) Define(api frontend.API) error {
 	// encryption
 	var state [16]uints.U32
 	one := uints.NewU32(1)
-	uapi.AssertEq(one, uints.NewU32(1)) //constrain the one value is equal to 1
+	// uapi.AssertEq(one, uints.NewU32(1)) //constrain the one value is equal to 1
 	counter := uints.NewU32(2)
 
 	for i := 0; i < n; i++ {
@@ -160,10 +160,11 @@ func (c *MyCircuit) Define(api frontend.API) error {
 		state[2] = uints.NewU32(0x79622d32)
 		state[3] = uints.NewU32(0x6b206574)
 
-		uapi.AssertEq(state[0], uints.NewU32(0x61707865)) //contrain the value assign to the start state is right
-		uapi.AssertEq(state[1], uints.NewU32(0x3320646e)) //contrain the value assign to the start state is right
-		uapi.AssertEq(state[2], uints.NewU32(0x79622d32)) //contrain the value assign to the start state is right
-		uapi.AssertEq(state[3], uints.NewU32(0x6b206574)) //contrain the value assign to the start state is right
+		// system already constrains when we create a value with constant
+		// uapi.AssertEq(state[0], uints.NewU32(0x61707865)) //contrain the value assign to the start state is right
+		// uapi.AssertEq(state[1], uints.NewU32(0x3320646e)) //contrain the value assign to the start state is right
+		// uapi.AssertEq(state[2], uints.NewU32(0x79622d32)) //contrain the value assign to the start state is right
+		// uapi.AssertEq(state[3], uints.NewU32(0x6b206574)) //contrain the value assign to the start state is right
 
 		// set key
 		copy(state[4:], c.Key[:])
