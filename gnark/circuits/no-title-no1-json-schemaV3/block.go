@@ -43,6 +43,19 @@ func (bapi *BlockAPI) IsEqual(block1, block2 *Block) frontend.Variable {
 	return isEqual
 }
 
+func (bapi *BlockAPI) IsEqual_NOTCHECKTYPE(block1, block2 *Block) frontend.Variable {
+	isEqual := frontend.Variable(1)
+	//don't concern about type,len, ref_index, self_index
+
+	//check equal data
+	for i := 0; i < 15; i++ {
+		isEqualData := bapi.uapi.IsEqual(block1.Data[i], block2.Data[i])
+		isEqual = bapi.api.And(isEqual, isEqualData)
+	}
+
+	return isEqual
+}
+
 func (bapi *BlockAPI) IsLess(block1, block2 *Block) frontend.Variable {
 	//check equal type & assert type is number
 	isEqualType := bapi.uapi.IsEqualU8(block1.Data_type, block2.Data_type)

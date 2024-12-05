@@ -136,9 +136,10 @@ func (c *MyCircuit) Define(api frontend.API) error {
 	}
 
 	// check some criterias
-	js.ANONYMOUS_KEYCHECK_Type(&c.Crits[0])
-	js.KEYCHECK_Type(&c.Crits[0])
+	// js.ANONYMOUS_KEYCHECK_Type(&c.Crits[0])
+	// js.KEYCHECK_Type(&c.Crits[0])
 
+	js.KEYCHECK_Require(&c.Crits[0])
 	// js.VALCHECK_Maximum(&c.Crits[1])
 
 	return nil

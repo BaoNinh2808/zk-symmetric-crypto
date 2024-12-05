@@ -111,7 +111,7 @@ func TestCipher(t *testing.T) {
 	crit0.Refs = []int{REF_TO_KEY}
 	crit0.RefObj = *block0
 	crit0.CritKey = *block2
-	crit0.IsRefsCheck = []bool{true}
+	crit0.IsRefsCheck = []bool{false}
 
 	// block00 := NewObjectKeyBlock()
 	// block00.Ref_index = uints.U8{Val: 0xff}
@@ -222,7 +222,6 @@ func TestCipher(t *testing.T) {
 	fmt.Printf("Setup Time: %v\n", elasedSetup)
 
 	witness.Crits[0].RefsCheckObj = []Block{*block0}
-
 	new_witness, _ := frontend.NewWitness(&witness, ecc.BN254.ScalarField())
 
 	// Measure time for proof generation

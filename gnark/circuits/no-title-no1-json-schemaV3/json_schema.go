@@ -55,10 +55,10 @@ func (js *JsonSchema) Deref_TOKEY(DerefBlock *Block, RefBlock *Block, IsRefCheck
 	result := NewBlock()
 	for i := 0; i < split; i += 2 {
 		isSelect := js.bapi.uapi.IsEqualU8(js.data[i].Self_index, DerefBlock.Ref_index)
-		result.SelectBlock(js.bapi.api, isSelect, &js.data[i], RefBlock)
+		result.SelectBlock(js.bapi.api, isSelect, &js.data[i], result)
 	}
 
-	isEqualRefObj := frontend.Variable(0)
+	isEqualRefObj := frontend.Variable(1)
 	if IsRefCheck {
 		isEqualRefObj = js.bapi.IsEqual(result, &refsCheckObj)
 	}
@@ -72,7 +72,7 @@ func (js *JsonSchema) Deref_TOVAL(DerefBlock *Block, RefBlock *Block, IsRefCheck
 		result.SelectBlock(js.bapi.api, isSelect, &js.data[i], result)
 	}
 
-	isEqualRefObj := frontend.Variable(0)
+	isEqualRefObj := frontend.Variable(1)
 	if IsRefCheck {
 		isEqualRefObj = js.bapi.IsEqual(result, &refsCheckObj)
 	}
@@ -86,7 +86,7 @@ func (js *JsonSchema) Deref_TOARRAYPART(DerefBlock *Block, RefBlock *Block, IsRe
 		result.SelectBlock(js.bapi.api, isSelect, &js.data[i], result)
 	}
 
-	isEqualRefObj := frontend.Variable(0)
+	isEqualRefObj := frontend.Variable(1)
 	if IsRefCheck {
 		isEqualRefObj = js.bapi.IsEqual(result, &refsCheckObj)
 	}
@@ -94,12 +94,6 @@ func (js *JsonSchema) Deref_TOARRAYPART(DerefBlock *Block, RefBlock *Block, IsRe
 }
 
 func (js *JsonSchema) IsReference(block *Block, crit *Criteria) frontend.Variable {
-	//create a slice of *Block from slice of Block
-	// refsCheckObj := make([]*Block, len(crit.RefsCheckObj))
-	// for i := 0; i < len(crit.RefsCheckObj); i++ {
-	// 	refsCheckObj[i] = &crit.RefsCheckObj[i]
-	// }
-
 	refBlock := js.Dereferences(block, crit.Refs, crit.IsRefsCheck, crit.RefsCheckObj)
 	isRef := js.bapi.IsEqual(refBlock, &crit.RefObj)
 	return isRef
@@ -253,6 +247,20 @@ func (js *JsonSchema) ARRAYPART_VALCHECK_Minimum(crit *Criteria) {
 		isSatisfy := js.Minimum_Val(&js.data[i], crit)
 		js.bapi.api.AssertIsEqual(isSatisfy, 1)
 	}
+}
+
+// ------------OBJECT: REQUIRE---------//
+func (js *JsonSchema) KEYCHECK_Require(crit *Criteria) {
+	isPass := frontend.Variable(0)
+	for i := 0; i < split; i += 2 {
+		isRef := js.IsReference(&js.data[i], crit)
+		isEqualData := js.bapi.IsEqual_NOTCHECKTYPE(&js.data[i], &crit.CritKey)
+		isSatisfy := js.bapi.api.And(isRef, isEqualData)
+
+		isPass = js.bapi.api.Xor(isPass, isSatisfy)
+	}
+
+	js.bapi.api.AssertIsEqual(isPass, 1)
 }
 
 // func (js *JsonSchema) Require(requireKey *Block, index uints.U8) {
