@@ -101,82 +101,94 @@ func (js *JsonSchema) IsReference(block *Block, crit *Criteria) frontend.Variabl
 
 //-----------TYPE----------//
 
-func (js *JsonSchema) Type_AnonymousKey(block *Block, crit *Criteria) frontend.Variable {
+func (js *JsonSchema) Type_AnonymousKey(block *Block, crit *Criteria) (frontend.Variable, frontend.Variable) {
 	isRef := js.IsReference(block, crit)
 	isEqualType := js.bapi.uapi.IsEqualU8(block.Data_type, crit.CritKey.Data_type)
 
 	isPass := js.bapi.api.And(isRef, isEqualType)
-	return js.bapi.api.Select(isRef, isPass, 1)
+	return isRef, isPass
 }
 
-func (js *JsonSchema) Type_AnonymousVal(block *Block, crit *Criteria) frontend.Variable {
+func (js *JsonSchema) Type_AnonymousVal(block *Block, crit *Criteria) (frontend.Variable, frontend.Variable) {
 	isRef := js.IsReference(block, crit)
 	isEqualType := js.bapi.uapi.IsEqualU8(block.Data_type, crit.CritVal.Data_type)
 
 	isPass := js.bapi.api.And(isRef, isEqualType)
-	return js.bapi.api.Select(isRef, isPass, 1)
+	return isRef, isPass
 }
 
-func (js *JsonSchema) Type_Key(block *Block, crit *Criteria) frontend.Variable {
+func (js *JsonSchema) Type_Key(block *Block, crit *Criteria) (frontend.Variable, frontend.Variable) {
 	isRef := js.IsReference(block, crit)
 	isEqualType := js.bapi.uapi.IsEqualU8(block.Data_type, crit.CritKey.Data_type)
 	isEqualKey := js.bapi.IsEqual(block, &crit.CritKey)
 
 	isPass := js.bapi.api.And(isRef, isEqualType)
 	isPass = js.bapi.api.And(isPass, isEqualKey)
-	return js.bapi.api.Select(isRef, isPass, 1)
+	return isRef, isPass
 }
 
-func (js *JsonSchema) Type_Val(block *Block, crit *Criteria) frontend.Variable {
+func (js *JsonSchema) Type_Val(block *Block, crit *Criteria) (frontend.Variable, frontend.Variable) {
 	isRef := js.IsReference(block, crit)
 	isEqualType := js.bapi.uapi.IsEqualU8(block.Data_type, crit.CritVal.Data_type)
 	isEqualVal := js.bapi.IsEqual(block, &crit.CritVal)
 
 	isPass := js.bapi.api.And(isRef, isEqualType)
 	isPass = js.bapi.api.And(isPass, isEqualVal)
-	return js.bapi.api.Select(isRef, isPass, 1)
+	return isRef, isPass
 }
 
 func (js *JsonSchema) ANONYMOUS_KEYCHECK_Type(crit *Criteria) {
 	for i := 0; i < split; i += 2 {
-		isSatisfy := js.Type_AnonymousKey(&js.data[i], crit)
-		js.bapi.api.AssertIsEqual(isSatisfy, 1)
+		isRef, isSatisfy := js.Type_AnonymousKey(&js.data[i], crit)
+		isOne := js.bapi.api.Select(isRef, isSatisfy, 1)
+		js.bapi.api.AssertIsEqual(isOne, 1)
 	}
 }
 
 func (js *JsonSchema) ANONYMOUS_VALCHECK_Type(crit *Criteria) {
 	for i := 1; i < split; i += 2 {
-		isSatisfy := js.Type_AnonymousVal(&js.data[i], crit)
-		js.bapi.api.AssertIsEqual(isSatisfy, 1)
+		isRef, isSatisfy := js.Type_AnonymousVal(&js.data[i], crit)
+		isOne := js.bapi.api.Select(isRef, isSatisfy, 1)
+		js.bapi.api.AssertIsEqual(isOne, 1)
 	}
 }
 
 func (js *JsonSchema) ANONYMOUS_ARRAYPART_VALCHECK_Type(crit *Criteria) {
 	for i := split; i < n; i++ {
-		isSatisfy := js.Type_AnonymousVal(&js.data[i], crit)
-		js.bapi.api.AssertIsEqual(isSatisfy, 1)
+		isRef, isSatisfy := js.Type_AnonymousVal(&js.data[i], crit)
+		isOne := js.bapi.api.Select(isRef, isSatisfy, 1)
+		js.bapi.api.AssertIsEqual(isOne, 1)
 	}
 }
 
 func (js *JsonSchema) KEYCHECK_Type(crit *Criteria) {
+	isPass := frontend.Variable(0)
 	for i := 0; i < split; i += 2 {
-		isSatisfy := js.Type_Key(&js.data[i], crit)
-		js.bapi.api.AssertIsEqual(isSatisfy, 1)
+		isRef, isSatisfy := js.Type_Key(&js.data[i], crit)
+		isSatisfy = js.bapi.api.And(isRef, isSatisfy) //only check if isRef is true --> only one key is satisfied
+		isPass = js.bapi.api.Xor(isPass, isSatisfy)
 	}
+	js.bapi.api.AssertIsEqual(isPass, 1)
 }
 
 func (js *JsonSchema) VALCHECK_Type(crit *Criteria) {
+	isPass := frontend.Variable(0)
 	for i := 1; i < split; i += 2 {
-		isSatisfy := js.Type_Val(&js.data[i], crit)
-		js.bapi.api.AssertIsEqual(isSatisfy, 1)
+		isRef, isSatisfy := js.Type_Val(&js.data[i], crit)
+		isSatisfy = js.bapi.api.And(isRef, isSatisfy) //only check if isRef is true --> only one val is satisfied
+		isPass = js.bapi.api.Xor(isPass, isSatisfy)
 	}
+	js.bapi.api.AssertIsEqual(isPass, 1)
 }
 
 func (js *JsonSchema) ARRAYPART_VALCHECK_Type(crit *Criteria) {
+	isPass := frontend.Variable(0)
 	for i := split; i < n; i++ {
-		isSatisfy := js.Type_Val(&js.data[i], crit)
-		js.bapi.api.AssertIsEqual(isSatisfy, 1)
+		isRef, isSatisfy := js.Type_Val(&js.data[i], crit)
+		isSatisfy = js.bapi.api.And(isRef, isSatisfy) //only check if isRef is true --> only one val is satisfied
+		isPass = js.bapi.api.Xor(isPass, isSatisfy)
 	}
+	js.bapi.api.AssertIsEqual(isPass, 1)
 }
 
 //------------NUMBER: MAX---------//
@@ -251,334 +263,18 @@ func (js *JsonSchema) ARRAYPART_VALCHECK_Minimum(crit *Criteria) {
 
 // ------------OBJECT: REQUIRE---------//
 func (js *JsonSchema) KEYCHECK_Require(crit *Criteria) {
-	isPass := frontend.Variable(0)
+	sumCheck := frontend.Variable(0)
 	for i := 0; i < split; i += 2 {
 		isRef := js.IsReference(&js.data[i], crit)
+		// isEqualData := frontend.Variable(1)
 		isEqualData := js.bapi.IsEqual_NOTCHECKTYPE(&js.data[i], &crit.CritKey)
 		isSatisfy := js.bapi.api.And(isRef, isEqualData)
 
-		isPass = js.bapi.api.Xor(isPass, isSatisfy)
+		sumCheck = js.bapi.api.Add(sumCheck, isSatisfy) //must change to Add (refObj.Len - 1)
+
+		isOne := js.bapi.api.Select(isRef, isSatisfy, 1)
+		isPenalty := js.bapi.api.Select(isOne, 0, -1)
+		sumCheck = js.bapi.api.Add(sumCheck, isPenalty)
 	}
-
-	js.bapi.api.AssertIsEqual(isPass, 1)
+	js.bapi.api.AssertIsEqual(sumCheck, 0)
 }
-
-// func (js *JsonSchema) Require(requireKey *Block, index uints.U8) {
-// 	isPass := frontend.Variable(0)
-// 	for i := 0; i < split; i += 2 {
-// 		key_index := uints.NewU8(uint8(i))
-// 		isCorrectIndex := js.bapi.uapi.IsEqualU8(key_index, index)
-// 		isEqualKey := js.bapi.IsEqual(requireKey, &js.data[i])
-// 		isCorrect := js.bapi.api.And(isCorrectIndex, isEqualKey)
-// 		isPass = js.bapi.api.Xor(isPass, isCorrect)
-// 	}
-// 	js.bapi.api.AssertIsEqual(isPass, 1) //there is only 1 position is correct
-// }
-
-// func (js *JsonSchema) Maximum(criteriaKey *Block, criteriaVal *Block, index uints.U8) {
-// 	// pass if:
-// 	// 1. key = criteriaKey & val < criteriaVal
-// 	// 2. index = 0xff & for all key : key != criteriaKey
-
-// 	isCase1Pass := frontend.Variable(0)
-// 	is0xff := js.bapi.uapi.IsEqualU8(index, uints.NewU8(0xff))
-// 	isAllKeyDiff := frontend.Variable(1)
-// 	for i := 0; i < split; i += 2 {
-// 		key_index := uints.NewU8(uint8(i))
-// 		isCorrectIndex := js.bapi.uapi.IsEqualU8(key_index, index)
-
-// 		isNumberKeyType := js.bapi.uapi.IsEqualU8(js.data[i].Data_type, uints.NewU8(NUMBER_KEY_TYPE))
-// 		isEqualKey := js.bapi.IsEqual(&js.data[i], criteriaKey)
-// 		isLessVal := js.bapi.IsLess(&js.data[i+1], criteriaVal)
-
-// 		isCorrect := js.bapi.api.And(isEqualKey, isLessVal)
-// 		isCorrect = js.bapi.api.And(isCorrect, isCorrectIndex)
-// 		isCorrect = js.bapi.api.And(isCorrect, isNumberKeyType)
-
-// 		isCase1Pass = js.bapi.api.Xor(isCase1Pass, isCorrect)
-
-// 		isDiffKey := js.bapi.api.Xor(isEqualKey, 1)
-// 		isAllKeyDiff = js.bapi.api.And(isAllKeyDiff, isDiffKey)
-// 		isAllKeyDiff = js.bapi.api.Or(isAllKeyDiff, isNumberKeyType)
-// 	}
-
-// 	isCase2Pass := js.bapi.api.And(isAllKeyDiff, is0xff)
-// 	isPass := js.bapi.api.Or(isCase1Pass, isCase2Pass)
-
-// 	js.bapi.api.AssertIsEqual(isPass, 1)
-// }
-
-// func (js *JsonSchema) MaximumU8(criteriaKey *Block, criteriaVal *Block, index uints.U8) {
-// 	// pass if:
-// 	// 1. key = criteriaKey & val < criteriaVal
-// 	// 2. index = 0xff & for all key : key != criteriaKey
-
-// 	isCase1Pass := frontend.Variable(0)
-// 	is0xff := js.bapi.uapi.IsEqualU8(index, uints.NewU8(0xff))
-// 	isAllKeyDiff := frontend.Variable(1)
-// 	for i := 0; i < split; i += 2 {
-// 		key_index := uints.NewU8(uint8(i))
-// 		isCorrectIndex := js.bapi.uapi.IsEqualU8(key_index, index)
-
-// 		isNumberKeyType := js.bapi.uapi.IsEqualU8(js.data[i].Data_type, uints.NewU8(NUMBER_KEY_TYPE))
-// 		isEqualKey := js.bapi.IsEqual(&js.data[i], criteriaKey)
-// 		isLessVal := js.bapi.IsLessNumberU8(&js.data[i+1], criteriaVal)
-
-// 		isCorrect := js.bapi.api.And(isEqualKey, isLessVal)
-// 		isCorrect = js.bapi.api.And(isCorrect, isCorrectIndex)
-// 		isCorrect = js.bapi.api.And(isCorrect, isNumberKeyType)
-
-// 		isCase1Pass = js.bapi.api.Xor(isCase1Pass, isCorrect)
-
-// 		isDiffKey := js.bapi.api.Xor(isEqualKey, 1)
-// 		isAllKeyDiff = js.bapi.api.And(isAllKeyDiff, isDiffKey)
-// 		isAllKeyDiff = js.bapi.api.Or(isAllKeyDiff, isNumberKeyType)
-// 	}
-
-// 	isCase2Pass := js.bapi.api.And(isAllKeyDiff, is0xff)
-// 	isPass := js.bapi.api.Or(isCase1Pass, isCase2Pass)
-
-// 	js.bapi.api.AssertIsEqual(isPass, 1)
-// }
-
-// func (js *JsonSchema) MaximumU32(criteriaKey *Block, criteriaVal *Block, index uints.U8) {
-// 	// pass if:
-// 	// 1. key = criteriaKey & val < criteriaVal
-// 	// 2. index = 0xff & for all key : key != criteriaKey
-
-// 	isCase1Pass := frontend.Variable(0)
-// 	is0xff := js.bapi.uapi.IsEqualU8(index, uints.NewU8(0xff))
-// 	isAllKeyDiff := frontend.Variable(1)
-// 	for i := 0; i < split; i += 2 {
-// 		key_index := uints.NewU8(uint8(i))
-// 		isCorrectIndex := js.bapi.uapi.IsEqualU8(key_index, index)
-
-// 		isNumberKeyType := js.bapi.uapi.IsEqualU8(js.data[i].Data_type, uints.NewU8(NUMBER_KEY_TYPE))
-// 		isEqualKey := js.bapi.IsEqual(&js.data[i], criteriaKey)
-// 		isLessVal := js.bapi.IsLessNumberU32(&js.data[i+1], criteriaVal)
-
-// 		isCorrect := js.bapi.api.And(isEqualKey, isLessVal)
-// 		isCorrect = js.bapi.api.And(isCorrect, isCorrectIndex)
-// 		isCorrect = js.bapi.api.And(isCorrect, isNumberKeyType)
-
-// 		isCase1Pass = js.bapi.api.Xor(isCase1Pass, isCorrect)
-
-// 		isDiffKey := js.bapi.api.Xor(isEqualKey, 1)
-// 		isAllKeyDiff = js.bapi.api.And(isAllKeyDiff, isDiffKey)
-// 		isAllKeyDiff = js.bapi.api.Or(isAllKeyDiff, isNumberKeyType)
-// 	}
-
-// 	isCase2Pass := js.bapi.api.And(isAllKeyDiff, is0xff)
-// 	isPass := js.bapi.api.Or(isCase1Pass, isCase2Pass)
-
-// 	js.bapi.api.AssertIsEqual(isPass, 1)
-// }
-
-// func (js *JsonSchema) Minimum(criteriaKey *Block, criteriaVal *Block, index uints.U8) {
-// 	// pass if:
-// 	// 1. key = criteriaKey & val > criteriaVal
-// 	// 2. index = 0xff & for all key : key != criteriaKey
-
-// 	isCase1Pass := frontend.Variable(0)
-// 	is0xff := js.bapi.uapi.IsEqualU8(index, uints.NewU8(0xff))
-// 	isAllKeyDiff := frontend.Variable(1)
-// 	for i := 0; i < split; i += 2 {
-// 		key_index := uints.NewU8(uint8(i))
-// 		isCorrectIndex := js.bapi.uapi.IsEqualU8(key_index, index)
-
-// 		isNumberKeyType := js.bapi.uapi.IsEqualU8(js.data[i].Data_type, uints.NewU8(NUMBER_KEY_TYPE))
-// 		isEqualKey := js.bapi.IsEqual(&js.data[i], criteriaKey)
-// 		isGreaterVal := js.bapi.IsLess(criteriaVal, &js.data[i+1])
-
-// 		isCorrect := js.bapi.api.And(isEqualKey, isGreaterVal)
-// 		isCorrect = js.bapi.api.And(isCorrect, isCorrectIndex)
-// 		isCorrect = js.bapi.api.And(isCorrect, isNumberKeyType)
-
-// 		isCase1Pass = js.bapi.api.Xor(isCase1Pass, isCorrect)
-
-// 		isDiffKey := js.bapi.api.Xor(isEqualKey, 1)
-// 		isAllKeyDiff = js.bapi.api.And(isAllKeyDiff, isDiffKey)
-// 		isAllKeyDiff = js.bapi.api.Or(isAllKeyDiff, isNumberKeyType)
-// 	}
-
-// 	isCase2Pass := js.bapi.api.And(isAllKeyDiff, is0xff)
-// 	isPass := js.bapi.api.Or(isCase1Pass, isCase2Pass)
-
-// 	js.bapi.api.AssertIsEqual(isPass, 1)
-// }
-
-// func (js *JsonSchema) MinimumU8(criteriaKey *Block, criteriaVal *Block, index uints.U8) {
-// 	// pass if:
-// 	// 1. key = criteriaKey & val > criteriaVal
-// 	// 2. index = 0xff & for all key : key != criteriaKey
-
-// 	isCase1Pass := frontend.Variable(0)
-// 	is0xff := js.bapi.uapi.IsEqualU8(index, uints.NewU8(0xff))
-// 	isAllKeyDiff := frontend.Variable(1)
-// 	for i := 0; i < split; i += 2 {
-// 		key_index := uints.NewU8(uint8(i))
-// 		isCorrectIndex := js.bapi.uapi.IsEqualU8(key_index, index)
-
-// 		isNumberKeyType := js.bapi.uapi.IsEqualU8(js.data[i].Data_type, uints.NewU8(NUMBER_KEY_TYPE))
-// 		isEqualKey := js.bapi.IsEqual(&js.data[i], criteriaKey)
-// 		isGreaterVal := js.bapi.IsLessNumberU8(criteriaVal, &js.data[i+1])
-
-// 		isCorrect := js.bapi.api.And(isEqualKey, isGreaterVal)
-// 		isCorrect = js.bapi.api.And(isCorrect, isCorrectIndex)
-// 		isCorrect = js.bapi.api.And(isCorrect, isNumberKeyType)
-
-// 		isCase1Pass = js.bapi.api.Xor(isCase1Pass, isCorrect)
-
-// 		isDiffKey := js.bapi.api.Xor(isEqualKey, 1)
-// 		isAllKeyDiff = js.bapi.api.And(isAllKeyDiff, isDiffKey)
-// 		isAllKeyDiff = js.bapi.api.Or(isAllKeyDiff, isNumberKeyType)
-// 	}
-
-// 	isCase2Pass := js.bapi.api.And(isAllKeyDiff, is0xff)
-// 	isPass := js.bapi.api.Or(isCase1Pass, isCase2Pass)
-
-// 	js.bapi.api.AssertIsEqual(isPass, 1)
-// }
-
-// func (js *JsonSchema) MinimumU32(criteriaKey *Block, criteriaVal *Block, index uints.U8) {
-// 	// pass if:
-// 	// 1. key = criteriaKey & val > criteriaVal
-// 	// 2. index = 0xff & for all key : key != criteriaKey
-
-// 	isCase1Pass := frontend.Variable(0)
-// 	is0xff := js.bapi.uapi.IsEqualU8(index, uints.NewU8(0xff))
-// 	isAllKeyDiff := frontend.Variable(1)
-// 	for i := 0; i < split; i += 2 {
-// 		key_index := uints.NewU8(uint8(i))
-// 		isCorrectIndex := js.bapi.uapi.IsEqualU8(key_index, index)
-
-// 		isNumberKeyType := js.bapi.uapi.IsEqualU8(js.data[i].Data_type, uints.NewU8(NUMBER_KEY_TYPE))
-// 		isEqualKey := js.bapi.IsEqual(&js.data[i], criteriaKey)
-// 		isGreaterVal := js.bapi.IsLessNumberU32(criteriaVal, &js.data[i+1])
-
-// 		isCorrect := js.bapi.api.And(isEqualKey, isGreaterVal)
-// 		isCorrect = js.bapi.api.And(isCorrect, isCorrectIndex)
-// 		isCorrect = js.bapi.api.And(isCorrect, isNumberKeyType)
-
-// 		isCase1Pass = js.bapi.api.Xor(isCase1Pass, isCorrect)
-
-// 		isDiffKey := js.bapi.api.Xor(isEqualKey, 1)
-// 		isAllKeyDiff = js.bapi.api.And(isAllKeyDiff, isDiffKey)
-// 		isAllKeyDiff = js.bapi.api.Or(isAllKeyDiff, isNumberKeyType)
-// 	}
-
-// 	isCase2Pass := js.bapi.api.And(isAllKeyDiff, is0xff)
-// 	isPass := js.bapi.api.Or(isCase1Pass, isCase2Pass)
-
-// 	js.bapi.api.AssertIsEqual(isPass, 1)
-// }
-
-// func (js *JsonSchema) Type(index uints.U8, allowTypes []uint8) {
-// 	isPass := frontend.Variable(0)
-// 	for i := 0; i < split; i += 2 {
-// 		key_index := uints.NewU8(uint8(i))
-// 		isCorrectIndex := js.bapi.uapi.IsEqualU8(key_index, index)
-// 		isCorrectKeyType := frontend.Variable(0)
-
-// 		for _, allowType := range allowTypes {
-// 			isEqualType := js.bapi.uapi.IsEqualU8(js.data[i].Data_type, uints.NewU8(allowType))
-// 			isCorrectKeyType = js.bapi.api.Xor(isCorrectKeyType, isEqualType)
-// 		}
-
-// 		isCorrect := js.bapi.api.And(isCorrectIndex, isCorrectKeyType)
-// 		isPass = js.bapi.api.Xor(isCorrect, isPass)
-// 	}
-// 	js.bapi.api.AssertIsEqual(isPass, 1)
-// }
-
-// func (js *JsonSchema) MaxLength(max uints.U8, index uints.U8) {
-// 	isPass := frontend.Variable(0)
-// 	for i := 1; i < split; i += 2 {
-// 		arr_val_index := uints.NewU8(uint8(i))
-
-// 		isCorrectIndex := js.bapi.uapi.IsEqualU8(arr_val_index, index)
-// 		isCorrectValType := js.bapi.uapi.IsEqualU8(js.data[i].Data_type, uints.NewU8(ARRAY_VAL_TYPE))
-// 		isLenLessThanMax := js.bapi.uapi.IsLessU8(js.data[i].Len, max)
-
-// 		isSatisfy := js.bapi.api.And(isCorrectIndex, isLenLessThanMax)
-// 		isSatisfy = js.bapi.api.And(isSatisfy, isCorrectValType)
-
-// 		isPass = js.bapi.api.Xor(isSatisfy, isPass)
-// 	}
-// 	js.bapi.api.AssertIsEqual(isPass, 1)
-// }
-
-// func (js *JsonSchema) MinLength(min uints.U8, index uints.U8) {
-// 	isPass := frontend.Variable(0)
-// 	for i := 1; i < split; i += 2 {
-// 		arr_val_index := uints.NewU8(uint8(i))
-
-// 		isCorrectIndex := js.bapi.uapi.IsEqualU8(arr_val_index, index)
-// 		isCorrectValType := js.bapi.uapi.IsEqualU8(js.data[i].Data_type, uints.NewU8(ARRAY_VAL_TYPE))
-// 		isLenGreaterThanMin := js.bapi.uapi.IsLessU8(min, js.data[i].Len)
-
-// 		isSatisfy := js.bapi.api.And(isCorrectIndex, isLenGreaterThanMin)
-// 		isSatisfy = js.bapi.api.And(isSatisfy, isCorrectValType)
-
-// 		isPass = js.bapi.api.Xor(isSatisfy, isPass)
-// 	}
-// 	js.bapi.api.AssertIsEqual(isPass, 1)
-// }
-
-// func (js *JsonSchema) MaxProperties(max uints.U8, index uints.U8) {
-// 	isPass := frontend.Variable(0)
-// 	for i := 0; i < split; i += 2 {
-// 		obj_key_index := uints.NewU8(uint8(i))
-
-// 		isCorrectIndex := js.bapi.uapi.IsEqualU8(obj_key_index, index)
-// 		isCorrectKeyType := js.bapi.uapi.IsEqualU8(js.data[i].Data_type, uints.NewU8(OBJECT_KEY_TYPE))
-// 		isLenLessThanMax := js.bapi.uapi.IsLessU8(js.data[i].Len, max)
-
-// 		isSatisfy := js.bapi.api.And(isCorrectIndex, isLenLessThanMax)
-// 		isSatisfy = js.bapi.api.And(isSatisfy, isCorrectKeyType)
-
-// 		isPass = js.bapi.api.Xor(isSatisfy, isPass)
-// 	}
-// 	js.bapi.api.AssertIsEqual(isPass, 1)
-// }
-
-// func (js *JsonSchema) MinProperties(min uints.U8, index uints.U8) {
-// 	isPass := frontend.Variable(0)
-// 	for i := 0; i < split; i += 2 {
-// 		obj_key_index := uints.NewU8(uint8(i))
-
-// 		isCorrectIndex := js.bapi.uapi.IsEqualU8(obj_key_index, index)
-// 		isCorrectKeyType := js.bapi.uapi.IsEqualU8(js.data[i].Data_type, uints.NewU8(OBJECT_KEY_TYPE))
-// 		isLenGreaterThanMin := js.bapi.uapi.IsLessU8(min, js.data[i].Len)
-
-// 		isSatisfy := js.bapi.api.And(isCorrectIndex, isLenGreaterThanMin)
-// 		isSatisfy = js.bapi.api.And(isSatisfy, isCorrectKeyType)
-
-// 		isPass = js.bapi.api.Xor(isSatisfy, isPass)
-// 	}
-// 	js.bapi.api.AssertIsEqual(isPass, 1)
-// }
-
-// func (js *JsonSchema) UniqueItems(index uints.U8) {
-// 	ref_index := uints.NewU8(0xff)
-// 	for i := 1; i < split; i += 2 {
-// 		arr_val_index := uints.NewU8(uint8(i))
-
-// 		isCorrectIndex := js.bapi.uapi.IsEqualU8(arr_val_index, index)
-// 		ref_index.Val = js.bapi.api.Select(isCorrectIndex, js.data[i].Ref_index.Val, ref_index.Val)
-// 	}
-
-// 	js.bapi.api.AssertIsDifferent(ref_index.Val, 0xff)
-// 	for i := split; i < n; i++ {
-// 		isSatisfy := frontend.Variable(1)
-// 		isRef_i := js.bapi.uapi.IsEqualU8(js.data[i].Ref_index, ref_index)
-// 		for j := i + 1; j < n; j++ {
-// 			isRef_j := js.bapi.uapi.IsEqualU8(js.data[j].Ref_index, ref_index)
-// 			isEqual := js.bapi.IsEqual(&js.data[i], &js.data[j])
-// 			isSameRefToConsiderArr := js.bapi.api.And(isRef_i, isRef_j)
-// 			isThisPairSatisfy := js.bapi.api.Xor(js.bapi.api.And(isEqual, isSameRefToConsiderArr), 1)
-// 			isSatisfy = js.bapi.api.And(isSatisfy, isThisPairSatisfy)
-// 		}
-// 		js.bapi.api.AssertIsEqual(isSatisfy, 1)
-// 	}
-// }
