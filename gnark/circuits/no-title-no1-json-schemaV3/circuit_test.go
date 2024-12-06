@@ -168,7 +168,7 @@ func TestCipher(t *testing.T) {
 
 	for i := 15; i < split; i += 2 {
 		blocki := NewEmptyValBlock()
-		blocki.Ref_index = uints.U8{Val: uint8(i)}
+		blocki.Ref_index = uints.U8{Val: uint8(i - 1)} // to make it equal to the key
 		data[i] = *blocki
 	}
 
@@ -188,9 +188,9 @@ func TestCipher(t *testing.T) {
 	/* crit0 */
 	witness.Data = data
 	crit0 := NewCriteria()
-	crit0.Refs = []int{REF_TO_KEY}
-	crit0.IsRefsCheck = []bool{false}
-	crit0.RefsCheckObj = []Block{*NewBlock()}
+	crit0.Refs = []int{}
+	crit0.IsRefsCheck = []bool{}
+	crit0.RefsCheckObj = []Block{}
 
 	crit0.RefObj = *block0
 	crit0.RefObj.Len = uints.NewU8(0)           // set to 0 like real data
@@ -283,12 +283,66 @@ func TestCipher(t *testing.T) {
 	crit5.RefObj.Self_index = uints.NewU8(0xff) // set to 0xff like real data
 	crit5.RefObj.Ref_index = uints.NewU8(0xff)  // set to 0xff like real data
 
-	crit5.CritKey = *block10
+	crit5.CritKey = *block6
 	crit5.CritKey.Len = uints.NewU8(0)           // set to 0 like real data
 	crit5.CritKey.Self_index = uints.NewU8(0xff) // set to 0xff like real data
 	crit5.CritKey.Ref_index = uints.NewU8(0xff)  // set to 0xff like real data
 
 	crit5.CritVal = *NewBlock() // dummy
+
+	/*crit6*/
+	crit6 := NewCriteria()
+	crit6.Refs = []int{REF_TO_ARRAY_PART, REF_TO_VAL, REF_TO_KEY}
+	crit6.IsRefsCheck = []bool{false, true, false}
+	crit6.RefsCheckObj = []Block{*NewBlock(), *vegetableValBlock, *NewBlock()}
+
+	crit6.RefObj = *block0
+	crit6.RefObj.Len = uints.NewU8(0)           // set to 0 like real data
+	crit6.RefObj.Self_index = uints.NewU8(0xff) // set to 0xff like real data
+	crit6.RefObj.Ref_index = uints.NewU8(0xff)  // set to 0xff like real data
+
+	crit6.CritKey = *block8
+	crit6.CritKey.Len = uints.NewU8(0)           // set to 0 like real data
+	crit6.CritKey.Self_index = uints.NewU8(0xff) // set to 0xff like real data
+	crit6.CritKey.Ref_index = uints.NewU8(0xff)  // set to 0xff like real data
+
+	crit6.CritVal = *NewBlock() // dummy
+
+	/*crit7*/
+	crit7 := NewCriteria()
+	crit7.Refs = []int{REF_TO_ARRAY_PART, REF_TO_VAL, REF_TO_KEY}
+	crit7.IsRefsCheck = []bool{false, true, false}
+	crit7.RefsCheckObj = []Block{*NewBlock(), *vegetableValBlock, *NewBlock()}
+
+	crit7.RefObj = *block0
+	crit7.RefObj.Len = uints.NewU8(0)           // set to 0 like real data
+	crit7.RefObj.Self_index = uints.NewU8(0xff) // set to 0xff like real data
+	crit7.RefObj.Ref_index = uints.NewU8(0xff)  // set to 0xff like real data
+
+	crit7.CritKey = *block6
+	crit7.CritKey.Len = uints.NewU8(0)           // set to 0 like real data
+	crit7.CritKey.Self_index = uints.NewU8(0xff) // set to 0xff like real data
+	crit7.CritKey.Ref_index = uints.NewU8(0xff)  // set to 0xff like real data
+
+	crit7.CritVal = *NewBlock() // dummy
+
+	/*crit8*/
+	crit8 := NewCriteria()
+	crit8.Refs = []int{REF_TO_ARRAY_PART, REF_TO_VAL, REF_TO_KEY}
+	crit8.IsRefsCheck = []bool{false, true, false}
+	crit8.RefsCheckObj = []Block{*NewBlock(), *vegetableValBlock, *NewBlock()}
+
+	crit8.RefObj = *block0
+	crit8.RefObj.Len = uints.NewU8(0)           // set to 0 like real data
+	crit8.RefObj.Self_index = uints.NewU8(0xff) // set to 0xff like real data
+	crit8.RefObj.Ref_index = uints.NewU8(0xff)  // set to 0xff like real data
+
+	crit8.CritKey = *block8
+	crit8.CritKey.Len = uints.NewU8(0)           // set to 0 like real data
+	crit8.CritKey.Self_index = uints.NewU8(0xff) // set to 0xff like real data
+	crit8.CritKey.Ref_index = uints.NewU8(0xff)  // set to 0xff like real data
+
+	crit8.CritVal = *NewBlock() // dummy
 
 	witness.Crits[0] = *crit0
 	witness.Crits[1] = *crit1
@@ -296,6 +350,9 @@ func TestCipher(t *testing.T) {
 	witness.Crits[3] = *crit3
 	witness.Crits[4] = *crit4
 	witness.Crits[5] = *crit5
+	witness.Crits[6] = *crit6
+	witness.Crits[7] = *crit7
+	witness.Crits[8] = *crit8
 
 	// set enc_data
 	enc_data := [64][16]uints.U32{}
@@ -378,6 +435,9 @@ func TestCipher(t *testing.T) {
 	myCircuit.Crits[3] = *crit3
 	myCircuit.Crits[4] = *crit4
 	myCircuit.Crits[5] = *crit5
+	myCircuit.Crits[6] = *crit6
+	myCircuit.Crits[7] = *crit7
+	myCircuit.Crits[8] = *crit8
 
 	startCompile := time.Now()
 	r1cs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &myCircuit)
@@ -393,12 +453,15 @@ func TestCipher(t *testing.T) {
 	elasedSetup := time.Since(startSetup)
 	fmt.Printf("Setup Time: %v\n", elasedSetup)
 
-	witness.Crits[0].RefsCheckObj = []Block{*NewBlock()}
+	witness.Crits[0].RefsCheckObj = []Block{}
 	witness.Crits[1].RefsCheckObj = []Block{*NewBlock()}
 	witness.Crits[2].RefsCheckObj = []Block{*fruitValBlock, *NewBlock()}
 	witness.Crits[3].RefsCheckObj = []Block{*NewBlock()}
 	witness.Crits[4].RefsCheckObj = []Block{*vegetableValBlock, *NewBlock()}
 	witness.Crits[5].RefsCheckObj = []Block{*NewBlock(), *vegetableValBlock, *NewBlock()}
+	witness.Crits[6].RefsCheckObj = []Block{*NewBlock(), *vegetableValBlock, *NewBlock()}
+	witness.Crits[7].RefsCheckObj = []Block{*NewBlock(), *vegetableValBlock, *NewBlock()}
+	witness.Crits[8].RefsCheckObj = []Block{*NewBlock(), *vegetableValBlock, *NewBlock()}
 
 	new_witness, _ := frontend.NewWitness(&witness, ecc.BN254.ScalarField())
 

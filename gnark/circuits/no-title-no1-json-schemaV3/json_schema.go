@@ -138,7 +138,7 @@ func (js *JsonSchema) Type_Val(block *Block, crit *Criteria) (frontend.Variable,
 }
 
 func (js *JsonSchema) ANONYMOUS_KEYCHECK_Type(crit *Criteria) {
-	for i := 0; i < split; i += 2 {
+	for i := 2; i < split; i += 2 {
 		isRef, isSatisfy := js.Type_AnonymousKey(&js.data[i], crit)
 		isOne := js.bapi.api.Select(isRef, isSatisfy, 1)
 		js.bapi.api.AssertIsEqual(isOne, 1)
@@ -146,7 +146,7 @@ func (js *JsonSchema) ANONYMOUS_KEYCHECK_Type(crit *Criteria) {
 }
 
 func (js *JsonSchema) ANONYMOUS_VALCHECK_Type(crit *Criteria) {
-	for i := 1; i < split; i += 2 {
+	for i := 3; i < split; i += 2 {
 		isRef, isSatisfy := js.Type_AnonymousVal(&js.data[i], crit)
 		isOne := js.bapi.api.Select(isRef, isSatisfy, 1)
 		js.bapi.api.AssertIsEqual(isOne, 1)
@@ -162,23 +162,40 @@ func (js *JsonSchema) ANONYMOUS_ARRAYPART_VALCHECK_Type(crit *Criteria) {
 }
 
 func (js *JsonSchema) KEYCHECK_Type(crit *Criteria) {
-	isPass := frontend.Variable(0)
-	for i := 0; i < split; i += 2 {
+	sumCheck := frontend.Variable(0)
+
+	for i := 2; i < split; i += 2 {
 		isRef, isSatisfy := js.Type_Key(&js.data[i], crit)
 		isSatisfy = js.bapi.api.And(isRef, isSatisfy) //only check if isRef is true --> only one key is satisfied
-		isPass = js.bapi.api.Xor(isPass, isSatisfy)
+
+		RefLen := js.Dereferences(&js.data[i], []int{crit.Refs[0]}, []bool{crit.IsRefsCheck[0]}, []Block{crit.RefsCheckObj[0]}).Len.Val
+		// RefLen := frontend.Variable(2)
+		addAmount := js.bapi.api.Select(isSatisfy, RefLen, 0)
+
+		sumCheck = js.bapi.api.Add(sumCheck, addAmount) //must change to Add (refObj.Len - 1)
+
+		isPenalty := js.bapi.api.Select(isRef, -1, 0)
+		sumCheck = js.bapi.api.Add(sumCheck, isPenalty)
 	}
-	js.bapi.api.AssertIsEqual(isPass, 1)
+	js.bapi.api.AssertIsEqual(sumCheck, 0)
 }
 
 func (js *JsonSchema) VALCHECK_Type(crit *Criteria) {
-	isPass := frontend.Variable(0)
-	for i := 1; i < split; i += 2 {
+	sumCheck := frontend.Variable(0)
+	for i := 3; i < split; i += 2 {
 		isRef, isSatisfy := js.Type_Val(&js.data[i], crit)
 		isSatisfy = js.bapi.api.And(isRef, isSatisfy) //only check if isRef is true --> only one val is satisfied
-		isPass = js.bapi.api.Xor(isPass, isSatisfy)
+
+		RefLen := js.Dereferences(&js.data[i], []int{crit.Refs[0]}, []bool{crit.IsRefsCheck[0]}, []Block{crit.RefsCheckObj[0]}).Len.Val
+		// RefLen := frontend.Variable(2)
+		addAmount := js.bapi.api.Select(isSatisfy, RefLen, 0)
+
+		sumCheck = js.bapi.api.Add(sumCheck, addAmount) //must change to Add (refObj.Len - 1)
+
+		isPenalty := js.bapi.api.Select(isRef, -1, 0)
+		sumCheck = js.bapi.api.Add(sumCheck, isPenalty)
 	}
-	js.bapi.api.AssertIsEqual(isPass, 1)
+	js.bapi.api.AssertIsEqual(sumCheck, 0)
 }
 
 func (js *JsonSchema) ARRAYPART_VALCHECK_Type(crit *Criteria) {
@@ -188,6 +205,16 @@ func (js *JsonSchema) ARRAYPART_VALCHECK_Type(crit *Criteria) {
 		isSatisfy = js.bapi.api.And(isRef, isSatisfy) //only check if isRef is true --> only one val is satisfied
 		isPass = js.bapi.api.Xor(isPass, isSatisfy)
 	}
+	js.bapi.api.AssertIsEqual(isPass, 1)
+}
+
+func (js *JsonSchema) ROOT_KEYCHECK_Type(crit *Criteria) {
+	isPass := js.bapi.uapi.IsEqualU8(js.data[0].Data_type, crit.CritKey.Data_type)
+	js.bapi.api.AssertIsEqual(isPass, 1)
+}
+
+func (js *JsonSchema) ROOT_VALCHECK_Type(crit *Criteria) {
+	isPass := js.bapi.uapi.IsEqualU8(js.data[1].Data_type, crit.CritVal.Data_type)
 	js.bapi.api.AssertIsEqual(isPass, 1)
 }
 
@@ -213,7 +240,7 @@ func (js *JsonSchema) Maximum_Val(val_block *Block, crit *Criteria) frontend.Var
 }
 
 func (js *JsonSchema) VALCHECK_Maximum(crit *Criteria) {
-	for i := 1; i < split; i += 2 {
+	for i := 3; i < split; i += 2 {
 		isSatisfy := js.Maximum(&js.data[i-1], &js.data[i], crit)
 		js.bapi.api.AssertIsEqual(isSatisfy, 1)
 	}
@@ -248,7 +275,7 @@ func (js *JsonSchema) Minimum_Val(val_block *Block, crit *Criteria) frontend.Var
 }
 
 func (js *JsonSchema) VALCHECK_Minimum(crit *Criteria) {
-	for i := 1; i < split; i += 2 {
+	for i := 3; i < split; i += 2 {
 		isSatisfy := js.Minimum(&js.data[i-1], &js.data[i], crit)
 		js.bapi.api.AssertIsEqual(isSatisfy, 1)
 	}
@@ -264,16 +291,19 @@ func (js *JsonSchema) ARRAYPART_VALCHECK_Minimum(crit *Criteria) {
 // ------------OBJECT: REQUIRE---------//
 func (js *JsonSchema) KEYCHECK_Require(crit *Criteria) {
 	sumCheck := frontend.Variable(0)
-	for i := 0; i < split; i += 2 {
+	for i := 2; i < split; i += 2 {
 		isRef := js.IsReference(&js.data[i], crit)
 		// isEqualData := frontend.Variable(1)
 		isEqualData := js.bapi.IsEqual_NOTCHECKTYPE(&js.data[i], &crit.CritKey)
 		isSatisfy := js.bapi.api.And(isRef, isEqualData)
 
-		sumCheck = js.bapi.api.Add(sumCheck, isSatisfy) //must change to Add (refObj.Len - 1)
+		RefLen := js.Dereferences(&js.data[i], []int{crit.Refs[0]}, []bool{crit.IsRefsCheck[0]}, []Block{crit.RefsCheckObj[0]}).Len.Val
+		// RefLen := frontend.Variable(2)
+		addAmount := js.bapi.api.Select(isSatisfy, RefLen, 0)
 
-		isOne := js.bapi.api.Select(isRef, isSatisfy, 1)
-		isPenalty := js.bapi.api.Select(isOne, 0, -1)
+		sumCheck = js.bapi.api.Add(sumCheck, addAmount) //must change to Add (refObj.Len - 1)
+
+		isPenalty := js.bapi.api.Select(isRef, -1, 0)
 		sumCheck = js.bapi.api.Add(sumCheck, isPenalty)
 	}
 	js.bapi.api.AssertIsEqual(sumCheck, 0)
