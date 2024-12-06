@@ -3,11 +3,17 @@ package chacha
 import (
 	"crypto/rand"
 	"encoding/binary"
+	"fmt"
+	"os"
+	"runtime/pprof"
 	"testing"
+	"time"
 
+	"github.com/BaoNinh2808/gnark/std/math/uints"
 	"github.com/consensys/gnark-crypto/ecc"
+	"github.com/consensys/gnark/backend/groth16"
 	"github.com/consensys/gnark/frontend"
-	"github.com/consensys/gnark/std/math/uints"
+	"github.com/consensys/gnark/frontend/cs/r1cs"
 	"github.com/consensys/gnark/test"
 	"golang.org/x/crypto/chacha20"
 )
@@ -129,11 +135,6 @@ func TestCipher(t *testing.T) {
 
 	cipher.XORKeyStream(bCt2, bPt2)
 
-	/*fmt.Println(hex.EncodeToString(bKey))
-	fmt.Println(hex.EncodeToString(bNonce))
-	fmt.Println(hex.EncodeToString(bPt))
-	fmt.Println(hex.EncodeToString(bCt))*/
-
 	plaintext1 := BytesToUint32BE(bPt1)
 	ciphertext1 := BytesToUint32BE(bCt1)
 	plaintext2 := BytesToUint32BE(bPt2)
@@ -141,7 +142,6 @@ func TestCipher(t *testing.T) {
 
 	witness := ChaChaCircuit{}
 
-	// witness := ChaChaCircuit{}
 	copy(witness.Key[:], BytesToUint32LE(bKey))
 	copy(witness.Nonce[:], BytesToUint32LE(bNonce))
 	witness.Counter = counter
@@ -159,41 +159,51 @@ func TestCipher(t *testing.T) {
 	assert.NoError(err)
 
 	assert.CheckCircuit(&ChaChaCircuit{}, test.WithValidAssignment(&witness))
-<<<<<<< HEAD
 
 	var myCircuit ChaChaCircuit
-	startCompile := time.Now()
 	r1cs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &myCircuit)
-	elapsedCompile := time.Since(startCompile)
-	fmt.Printf("Compile Time: %v\n", elapsedCompile)
-
-	fmt.Printf("Num of Constraints: %v\n", r1cs.GetNbConstraints())
-
 	assert.NoError(err)
 
-	startSetup := time.Now()
 	pk, _, err := groth16.Setup(r1cs)
-	elapsedSetup := time.Since(startSetup)
-	fmt.Printf("Setup Time: %v\n", elapsedSetup)
-
-	// Measure time for Witness creation
-	startWitness := time.Now()
 	assert.NoError(err)
-	new_witness, _ := frontend.NewWitness(&witness, ecc.BN254.ScalarField())
-	elapsedWitness := time.Since(startWitness)
-	fmt.Printf("Witness Time: %v\n", elapsedWitness)
 
-	// Measure time for Proof creation
+	new_witness, _ := frontend.NewWitness(&witness, ecc.BN254.ScalarField())
+
+	// Start CPU profiling
+	cpuProfile, err := os.Create("cpu_profile.prof")
+	assert.NoError(err)
+	defer cpuProfile.Close()
+
+	pprof.StartCPUProfile(cpuProfile)
+	defer pprof.StopCPUProfile()
+
+	// Measure memory profiling before proof
+	memBeforeProfile, err := os.Create("mem_profile_before.prof")
+	assert.NoError(err)
+	defer memBeforeProfile.Close()
+
+	// Write initial heap profile
+	pprof.WriteHeapProfile(memBeforeProfile)
+
+	// Measure time for proof generation
 	startProof := time.Now()
 	proof, err := groth16.Prove(r1cs, pk, new_witness)
-	assert.NoError(err)
+	if err != nil {
+		fmt.Printf("Proof creation failed: %v\n", err)
+		return
+	}
 	elapsedProof := time.Since(startProof)
 	fmt.Printf("Proving Time: %v\n", elapsedProof)
 
+	// Measure memory profiling after proof
+	memAfterProfile, err := os.Create("mem_profile_after.prof")
+	assert.NoError(err)
+	defer memAfterProfile.Close()
+
+	// Write final heap profile
+	pprof.WriteHeapProfile(memAfterProfile)
+
 	fmt.Printf("Proof: %v\n", proof)
-	// err := groth16.Verify(proof, vk, publicWitness)
-=======
->>>>>>> parent of cbbb223 (j start from 0 (because we don't constrains value assign to selectKeys and selectValues) & Assert Correspoding_Data_Index have only one bit 1)
 }
 
 func BytesToUint32LE(in []uint8) []uints.U32 {

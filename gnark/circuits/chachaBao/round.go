@@ -1,7 +1,7 @@
 package chacha
 
 import (
-	"github.com/consensys/gnark/std/math/uints"
+	"github.com/BaoNinh2808/gnark/std/math/uints"
 )
 
 // QR Chacha20 quarter round

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/BaoNinh2808/gnark/std/math/uints"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/std/math/cmp"
-	"github.com/consensys/gnark/std/math/uints"
 )
 
 const num_of_data_pieces = 2
@@ -124,7 +124,6 @@ func Satify(comparator_api *cmp.BoundedComparator, uapi *uints.BinaryField[uints
 	comparator_api.AssertIsLessEq(*variable1, *variable2)
 }
 
-<<<<<<< HEAD
 func AssertHasOneBit1(api frontend.API, variable frontend.Variable) { //for each n > 0, n & (n - 1) == 0
 	comparator_api := cmp.NewBoundedComparator(api, big.NewInt(100000), false)
 	comparator_api.AssertIsLess(0, variable) //variable > 0
@@ -143,8 +142,3 @@ func AssertHasOneBit1(api frontend.API, variable frontend.Variable) { //for each
 	zero := api.FromBinary(bitsZero[:]...)
 	api.AssertIsEqual(zero, 0)
 }
-=======
-// func Satify(comparator_api *cmp.BoundedComparator, uapi *uints.BinaryField[uints.U32], variable1 *frontend.Variable, variable2 *frontend.Variable) {
-// 	comparator_api.AssertIsLessEq(*variable1, *variable2)
-// }
->>>>>>> parent of cbbb223 (j start from 0 (because we don't constrains value assign to selectKeys and selectValues) & Assert Correspoding_Data_Index have only one bit 1)

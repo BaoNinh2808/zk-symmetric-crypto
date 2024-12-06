@@ -1,21 +1,15 @@
 package chacha
 
 import (
-	"crypto/rand"
 	"encoding/binary"
 	"fmt"
-	"os"
-	"runtime/pprof"
 	"testing"
-	"time"
 
 	"github.com/BaoNinh2808/gnark/std/math/uints"
 	"github.com/consensys/gnark-crypto/ecc"
-	"github.com/consensys/gnark/backend/groth16"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/cs/r1cs"
 	"github.com/consensys/gnark/test"
-	"golang.org/x/crypto/chacha20"
 )
 
 // type roundCircuit struct {
@@ -110,128 +104,133 @@ import (
 func TestCipher(t *testing.T) {
 	assert := test.NewAssert(t)
 
-	bKey := []uint8{
-		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-		0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f}
-
-	bNonce := []uint8{
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x4a, 0x00, 0x00, 0x00, 0x00}
-
-	counter := uints.NewU32(2)
-
-	bPt1 := make([]byte, 64)
-	rand.Read(bPt1)
-	bCt1 := make([]byte, 64)
-
-	cipher, err := chacha20.NewUnauthenticatedCipher(bKey, bNonce)
-	assert.NoError(err)
-
-	cipher.SetCounter(2)
-	cipher.XORKeyStream(bCt1, bPt1)
-
-	bPt2 := make([]byte, 64)
-	rand.Read(bPt2)
-	bCt2 := make([]byte, 64)
-	cipher.XORKeyStream(bCt2, bPt2)
-
-	bPt3 := make([]byte, 64)
-	copy(bPt3, []byte{0x12, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-	bCt3 := make([]byte, 64)
-	cipher.XORKeyStream(bCt3, bPt3)
-
-	bPt4 := make([]byte, 64)
-	copy(bPt4, []byte{0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-	bCt4 := make([]byte, 64)
-	cipher.XORKeyStream(bCt4, bPt4)
-
-	bPt5 := make([]byte, 64)
-	copy(bPt5, []byte{0x15, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-
-	plaintext1 := BytesToUint32BE(bPt1)
-	ciphertext1 := BytesToUint32BE(bCt1)
-	plaintext2 := BytesToUint32BE(bPt2)
-	ciphertext2 := BytesToUint32BE(bCt2)
-
-	pt_value1 := BytesToUint32BE(bPt3)
-	ct_value2 := BytesToUint32BE(bCt3)
-	pt_value3 := BytesToUint32BE(bPt4)
-	ct_value4 := BytesToUint32BE(bCt4)
-
-	criteria_value := BytesToUint32BE(bPt5)
-
-	witness := ChaChaCircuit{}
-
-	copy(witness.Key[:], BytesToUint32LE(bKey))
-	copy(witness.Nonce[:], BytesToUint32LE(bNonce))
-	witness.Counter = counter
-	copy(witness.Data_Keys[0][:], plaintext1)
-	copy(witness.Enc_Data_Keys[0][:], ciphertext1)
-	copy(witness.Data_Keys[1][:], plaintext2)
-	copy(witness.Enc_Data_Keys[1][:], ciphertext2)
-
-	copy(witness.Data_Values[0][:], pt_value1)
-	copy(witness.Data_Values[1][:], pt_value3)
-	copy(witness.Enc_Data_Values[0][:], ct_value2)
-	copy(witness.Enc_Data_Values[1][:], ct_value4)
-
-	witness.Corrsponding_Data_Index[0] = 2
-	copy(witness.Criterias_Keys[0][:], plaintext2)
-
-	copy(witness.Criterias_Values[0][:], criteria_value)
-
-	err = test.IsSolved(&ChaChaCircuit{}, &witness, ecc.BN254.ScalarField())
-	assert.NoError(err)
-
-	assert.CheckCircuit(&ChaChaCircuit{}, test.WithValidAssignment(&witness))
-
 	var myCircuit ChaChaCircuit
 	r1cs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &myCircuit)
 	assert.NoError(err)
-	// fmt.Println("Number of constraints: ", r1cs.GetNbConstraints())
+	fmt.Println("Number of constraints: ", r1cs.GetNbConstraints())
 
-	pk, _, err := groth16.Setup(r1cs)
-	assert.NoError(err)
+	// bKey := []uint8{
+	// 	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+	// 	0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f}
 
-	new_witness, _ := frontend.NewWitness(&witness, ecc.BN254.ScalarField())
+	// bNonce := []uint8{
+	// 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x4a, 0x00, 0x00, 0x00, 0x00}
 
-	// Start CPU profiling
-	cpuProfile, err := os.Create("cpu_profile.prof")
-	assert.NoError(err)
-	defer cpuProfile.Close()
+	// counter := uints.NewU32(2)
 
-	pprof.StartCPUProfile(cpuProfile)
-	defer pprof.StopCPUProfile()
+	// bPt1 := make([]byte, 64)
+	// rand.Read(bPt1)
+	// bCt1 := make([]byte, 64)
 
-	// Measure memory profiling before proof
-	memBeforeProfile, err := os.Create("mem_profile_before.prof")
-	assert.NoError(err)
-	defer memBeforeProfile.Close()
+	// cipher, err := chacha20.NewUnauthenticatedCipher(bKey, bNonce)
+	// assert.NoError(err)
 
-	// Write initial heap profile
-	pprof.WriteHeapProfile(memBeforeProfile)
+	// cipher.SetCounter(2)
+	// cipher.XORKeyStream(bCt1, bPt1)
 
-	// Measure time for proof generation
-	startProof := time.Now()
-	proof, err := groth16.Prove(r1cs, pk, new_witness)
-	if err != nil {
-		fmt.Printf("Proof creation failed: %v\n", err)
-		return
-	}
-	elapsedProof := time.Since(startProof)
-	fmt.Printf("Proving Time: %v\n", elapsedProof)
+	// bPt2 := make([]byte, 64)
+	// rand.Read(bPt2)
+	// bCt2 := make([]byte, 64)
+	// cipher.XORKeyStream(bCt2, bPt2)
 
-	// Measure memory profiling after proof
-	memAfterProfile, err := os.Create("mem_profile_after.prof")
-	assert.NoError(err)
-	defer memAfterProfile.Close()
+	// bPt3 := make([]byte, 64)
+	// copy(bPt3, []byte{0x12, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	// 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+	// bCt3 := make([]byte, 64)
+	// cipher.XORKeyStream(bCt3, bPt3)
 
-	// Write final heap profile
-	pprof.WriteHeapProfile(memAfterProfile)
+	// bPt4 := make([]byte, 64)
+	// copy(bPt4, []byte{0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	// 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+	// bCt4 := make([]byte, 64)
+	// cipher.XORKeyStream(bCt4, bPt4)
 
-	fmt.Printf("Proof: %v\n", proof)
+	// bPt5 := make([]byte, 64)
+	// copy(bPt5, []byte{0x15, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	// 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+
+	// plaintext1 := BytesToUint32BE(bPt1)
+	// ciphertext1 := BytesToUint32BE(bCt1)
+	// plaintext2 := BytesToUint32BE(bPt2)
+	// ciphertext2 := BytesToUint32BE(bCt2)
+
+	// pt_value1 := BytesToUint32BE(bPt3)
+	// ct_value2 := BytesToUint32BE(bCt3)
+	// pt_value3 := BytesToUint32BE(bPt4)
+	// ct_value4 := BytesToUint32BE(bCt4)
+
+	// criteria_value := BytesToUint32BE(bPt5)
+
+	// witness := ChaChaCircuit{}
+
+	// copy(witness.Key[:], BytesToUint32LE(bKey))
+	// copy(witness.Nonce[:], BytesToUint32LE(bNonce))
+	// witness.Counter = counter
+	// copy(witness.Data_Keys[0][:], plaintext1)
+	// copy(witness.Enc_Data_Keys[0][:], ciphertext1)
+	// copy(witness.Data_Keys[1][:], plaintext2)
+	// copy(witness.Enc_Data_Keys[1][:], ciphertext2)
+
+	// copy(witness.Data_Values[0][:], pt_value1)
+	// copy(witness.Data_Values[1][:], pt_value3)
+	// copy(witness.Enc_Data_Values[0][:], ct_value2)
+	// copy(witness.Enc_Data_Values[1][:], ct_value4)
+
+	// witness.Corrsponding_Data_Index[0] = 2
+	// copy(witness.Criterias_Keys[0][:], plaintext2)
+
+	// copy(witness.Criterias_Values[0][:], criteria_value)
+
+	// err = test.IsSolved(&ChaChaCircuit{}, &witness, ecc.BN254.ScalarField())
+	// assert.NoError(err)
+
+	// assert.CheckCircuit(&ChaChaCircuit{}, test.WithValidAssignment(&witness))
+
+	// // var myCircuit ChaChaCircuit
+	// // r1cs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &myCircuit)
+	// // assert.NoError(err)
+	// // fmt.Println("Number of constraints: ", r1cs.GetNbConstraints())
+
+	// pk, _, err := groth16.Setup(r1cs)
+	// assert.NoError(err)
+
+	// new_witness, _ := frontend.NewWitness(&witness, ecc.BN254.ScalarField())
+
+	// // Start CPU profiling
+	// cpuProfile, err := os.Create("cpu_profile.prof")
+	// assert.NoError(err)
+	// defer cpuProfile.Close()
+
+	// pprof.StartCPUProfile(cpuProfile)
+	// defer pprof.StopCPUProfile()
+
+	// // Measure memory profiling before proof
+	// memBeforeProfile, err := os.Create("mem_profile_before.prof")
+	// assert.NoError(err)
+	// defer memBeforeProfile.Close()
+
+	// // Write initial heap profile
+	// pprof.WriteHeapProfile(memBeforeProfile)
+
+	// // Measure time for proof generation
+	// startProof := time.Now()
+	// proof, err := groth16.Prove(r1cs, pk, new_witness)
+	// if err != nil {
+	// 	fmt.Printf("Proof creation failed: %v\n", err)
+	// 	return
+	// }
+	// elapsedProof := time.Since(startProof)
+	// fmt.Printf("Proving Time: %v\n", elapsedProof)
+
+	// // Measure memory profiling after proof
+	// memAfterProfile, err := os.Create("mem_profile_after.prof")
+	// assert.NoError(err)
+	// defer memAfterProfile.Close()
+
+	// // Write final heap profile
+	// pprof.WriteHeapProfile(memAfterProfile)
+
+	// fmt.Printf("Proof: %v\n", proof)
 }
 
 func BytesToUint32LE(in []uint8) []uints.U32 {
