@@ -1,45 +1,42 @@
-# Constrains benchmark
+# CONSTRAINTS
 
-1. Check Valid KeyType : 30984
+- Dereferences:
+    + root: 183
+    + REF_TO_KEY:
+        - NOT-CHECK: 
+            + 1 level: 1767
+            + 2 level: 3351
+            + 3 level: 4935
+            + (--> each level add 1584)
 
-2. Check Valid ValType : 31056
+        - WITH-CHECK: 
+            + 1 level: 2013
+            + 2 level: 3843
+            + 3 level: 5673
+            + (--> each level add 1830)
 
-3. Check Consistency between KeyType & ValType: 24
+    + REF_TO_VAL:
+        - NOT-CHECK: 
+            + 1 level: 1767
+            + 2 level: 3351
+            + 3 level: 4935
+            + (--> each level add 1584)
 
-4. Check Valid ValType (in array part) : 20752
+        - WITH-CHECK: 
+            + 1 level: 2013
+            + 2 level: 3843
+            + 3 level: 5673
+            + (--> each level add 1830)
 
-5. Check Continous Array Elements (in array part): 180
+    + REF_TO_ARRAY_PART:
+        - NOT-CHECK: 
+            + 1 level: 1239
+            + 2 level: 2295
+            + 3 level: 3351
+            + (--> each level add 1056)
 
-6. Check Correct Lenght of Object (Key): 576
-
-7. Check Correct Lenght of Array (Val): 792
-
-8. Check Criteria: 
- + (Check number is less: 4596)
- + Check Require : 4392
-
- + Check Maximum : 39747
- + Check Maximum U32 : 6459
- + Check Maximum U8 : 4803
-
- + Check Minimum: 39747
- + Check Minimum U32: 6459
- + Check Minimum U8: 4803
-
- + Check Type: 
-    - array 1 elements: 49
-    - array 2 elements: 122
-    - array 3 elements: 194
-    - array 4 elements: 266
-    - array 5 elements: 338
-    - array 6 elements: 410
-
-+ Check MaxLength: 386
-+ Check MinLength: 386
-
-+ Check MaxProperties: 386
-+ Check MinProperties: 386
-
-+ Check UniqueItems: 22113
-
-9. Check Encryption: 805468
+        - WITH-CHECK: 
+            + 1 level: 1485
+            + 2 level: 2787
+            + 3 level: 4089
+            + (--> each level add 1302)

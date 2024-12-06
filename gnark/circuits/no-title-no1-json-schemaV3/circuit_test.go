@@ -183,10 +183,12 @@ func TestCipher(t *testing.T) {
 		data[i].Self_index = index
 	}
 
+	witness.Data = data
+
 	//////////////CRITERIAS////////////////
 
 	/* crit0 */
-	witness.Data = data
+
 	crit0 := NewCriteria()
 	crit0.Refs = []int{}
 	crit0.IsRefsCheck = []bool{}

@@ -138,14 +138,16 @@ func (js *JsonSchema) Type_Val(block *Block, crit *Criteria) (frontend.Variable,
 }
 
 func (js *JsonSchema) ANONYMOUS_KEYCHECK_Type(crit *Criteria) {
+	//require all item ref to this obj must be satisfied
 	for i := 2; i < split; i += 2 {
 		isRef, isSatisfy := js.Type_AnonymousKey(&js.data[i], crit)
-		isOne := js.bapi.api.Select(isRef, isSatisfy, 1)
+		isOne := js.bapi.api.And(isRef, isSatisfy)
 		js.bapi.api.AssertIsEqual(isOne, 1)
 	}
 }
 
 func (js *JsonSchema) ANONYMOUS_VALCHECK_Type(crit *Criteria) {
+	//require all item ref to this obj must be satisfied
 	for i := 3; i < split; i += 2 {
 		isRef, isSatisfy := js.Type_AnonymousVal(&js.data[i], crit)
 		isOne := js.bapi.api.Select(isRef, isSatisfy, 1)
@@ -154,6 +156,7 @@ func (js *JsonSchema) ANONYMOUS_VALCHECK_Type(crit *Criteria) {
 }
 
 func (js *JsonSchema) ANONYMOUS_ARRAYPART_VALCHECK_Type(crit *Criteria) {
+	//require all item ref to this obj must be satisfied
 	for i := split; i < n; i++ {
 		isRef, isSatisfy := js.Type_AnonymousVal(&js.data[i], crit)
 		isOne := js.bapi.api.Select(isRef, isSatisfy, 1)
