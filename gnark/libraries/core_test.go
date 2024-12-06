@@ -1,9 +1,12 @@
 package libraries
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
 	"encoding/binary"
 	"encoding/json"
+	aes_v2 "gnark-symmetric-crypto/circuits/aesV2"
 	"gnark-symmetric-crypto/circuits/toprf"
 	prover "gnark-symmetric-crypto/libraries/prover/impl"
 	verifier "gnark-symmetric-crypto/libraries/verifier/impl"
@@ -12,7 +15,6 @@ import (
 	"math"
 	"math/big"
 	"os"
-	"sync"
 	"testing"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254/twistededwards"
@@ -20,7 +22,8 @@ import (
 	"golang.org/x/crypto/chacha20"
 )
 
-var chachaKey, aes128Key, aes256Key, chachaOprfKey, chachaR1CS, aes128r1cs, aes256r1cs, chachaOprfr1cs []byte
+var chachaKey, aes128Key, aes256Key, chachaOprfKey, aes128OprfKey, aes256OprfKey,
+	chachaR1CS, aes128r1cs, aes256r1cs, chachaOprfr1cs, aes128Oprfr1cs, aes256Oprfr1cs []byte
 
 const CHACHA20_BLOCKS = 2
 
@@ -29,11 +32,15 @@ func init() {
 	aes128Key, _ = fetchFile("pk.aes128")
 	aes256Key, _ = fetchFile("pk.aes256")
 	chachaOprfKey, _ = fetchFile("pk.chacha20_oprf")
+	aes128OprfKey, _ = fetchFile("pk.aes128_oprf")
+	aes256OprfKey, _ = fetchFile("pk.aes256_oprf")
 
 	chachaR1CS, _ = fetchFile("r1cs.chacha20")
 	aes128r1cs, _ = fetchFile("r1cs.aes128")
 	aes256r1cs, _ = fetchFile("r1cs.aes256")
 	chachaOprfr1cs, _ = fetchFile("r1cs.chacha20_oprf")
+	aes128Oprfr1cs, _ = fetchFile("r1cs.aes128_oprf")
+	aes256Oprfr1cs, _ = fetchFile("r1cs.aes256_oprf")
 }
 
 func TestInit(t *testing.T) {
@@ -41,127 +48,9 @@ func TestInit(t *testing.T) {
 	assert.True(prover.InitAlgorithm(prover.CHACHA20, chachaKey, chachaR1CS))
 	assert.True(prover.InitAlgorithm(prover.AES_128, aes128Key, aes128r1cs))
 	assert.True(prover.InitAlgorithm(prover.AES_256, aes256Key, aes256r1cs))
-	//	assert.True(prover.InitAlgorithm(prover.CHACHA20_OPRF, chachaOprfKey, chachaOprfr1cs))
-
-}
-
-func TestProveVerify(t *testing.T) {
-	assert := test.NewAssert(t)
-
-	proofs := make([][]byte, 0, 4)
-
-	wg := new(sync.WaitGroup)
-	wg.Add(4)
-	go func() {
-		assert.True(prover.InitAlgorithm(prover.CHACHA20, chachaKey, chachaR1CS))
-		params_struct := prover.InputParams{
-			Cipher:  "chacha20",
-			Key:     []byte{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-			Nonce:   []byte{3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3},
-			Counter: 3,
-			Input:   make([]uint8, 64*CHACHA20_BLOCKS),
-		}
-		params, err := json.Marshal(&params_struct)
-		assert.NoError(err)
-
-		res := prover.Prove(params)
-
-		assert.NotNil(res)
-		var outParams *prover.OutputParams
-		json.Unmarshal(res, &outParams)
-
-		var inParams *prover.InputParams
-		json.Unmarshal(params, &inParams)
-
-		signals := outParams.PublicSignals
-		signals = append(signals, inParams.Nonce...)
-		bCounter := make([]byte, 4)
-		binary.LittleEndian.PutUint32(bCounter, inParams.Counter)
-		signals = append(signals, bCounter...)
-		signals = append(signals, inParams.Input...)
-
-		inParams2 := &verifier.InputVerifyParams{
-			Cipher:        "chacha20",
-			Proof:         outParams.Proof.ProofJson,
-			PublicSignals: signals,
-		}
-		inBuf, _ := json.Marshal(inParams2)
-		proofs = append(proofs, inBuf)
-		wg.Done()
-	}()
-
-	go func() {
-		assert.True(prover.InitAlgorithm(prover.AES_128, aes128Key, aes128r1cs))
-		params := `{"cipher":"aes-128-ctr","key":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],"nonce":[3,3,3,3,3,3,3,3,3,3,3,3],"counter":2,"input":[183,4,206,60,254,21,117,9,150,227,246,245,71,101,56,67,79,93,44,163,22,89,128,55,214,254,228,214,89,253,176,112,138,115,93,140,194,222,104,252,49,144,91,252,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}`
-		res := prover.Prove([]byte(params))
-		assert.NotNil(res)
-
-		var outParams *prover.OutputParams
-		json.Unmarshal(res, &outParams)
-
-		var inParams *prover.InputParams
-		json.Unmarshal([]byte(params), &inParams)
-
-		signals := outParams.PublicSignals
-		signals = append(signals, inParams.Nonce...)
-		bCounter := make([]byte, 4)
-		binary.BigEndian.PutUint32(bCounter, inParams.Counter)
-		signals = append(signals, bCounter...)
-		signals = append(signals, inParams.Input...)
-
-		inParams2 := &verifier.InputVerifyParams{
-			Cipher:        "aes-128-ctr",
-			Proof:         outParams.Proof.ProofJson,
-			PublicSignals: signals,
-		}
-		inBuf, _ := json.Marshal(inParams2)
-		proofs = append(proofs, inBuf)
-		wg.Done()
-	}()
-
-	go func() {
-		assert.True(prover.InitAlgorithm(prover.AES_256, aes256Key, aes256r1cs))
-		params := `{"cipher":"aes-256-ctr","key":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],"nonce":[3,3,3,3,3,3,3,3,3,3,3,3],"counter":10,"input":[189,250,225,242,6,46,173,203,7,166,62,139,67,150,1,155,64,122,211,198,184,203,124,194,99,34,127,29,236,17,232,214,154,146,78,217,254,224,208,196,55,200,23,93,90,175,240,31,31,225,26,15,219,156,123,21,103,98,205,87,197,22,245,158]}`
-		res := prover.Prove([]byte(params))
-		assert.NotNil(res)
-
-		var outParams *prover.OutputParams
-		json.Unmarshal(res, &outParams)
-
-		var inParams *prover.InputParams
-		json.Unmarshal([]byte(params), &inParams)
-		signals := outParams.PublicSignals
-		signals = append(signals, inParams.Nonce...)
-		bCounter := make([]byte, 4)
-		binary.BigEndian.PutUint32(bCounter, inParams.Counter)
-		signals = append(signals, bCounter...)
-		signals = append(signals, inParams.Input...)
-
-		inParams2 := &verifier.InputVerifyParams{
-			Cipher:        "aes-256-ctr",
-			Proof:         outParams.Proof.ProofJson,
-			PublicSignals: signals,
-		}
-		inBuf, _ := json.Marshal(inParams2)
-		proofs = append(proofs, inBuf)
-		wg.Done()
-	}()
-
-	go func() {
-		assert.True(prover.InitAlgorithm(prover.CHACHA20_OPRF, chachaOprfKey, chachaOprfr1cs))
-		params := `{"cipher":"chacha20-toprf","key":"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=","nonce":"AAECAwQFBgcICQoL","counter":1,"input":"ifsIACkXpUC3g0uW62lOBqQR24t/F8LU5pcvxXXApjzsgCzz5h6xmDcydthllI8jfoSpdP0ouJsSuNkHkE+e1nl4vM3lFCzpxBZNvBh83PHa3kcyb2rwPg5X8A7YfQK/Td5s8/fZJ/SxW/O3opG3gOlvVjiJXUD4T20033k/v0Y=","toprf":{"pos":10,"len":14,"mask":"fblY6lWzyAzOpIU5Fx86+iQOMDIPNyE/gWKsM9Fh6g==","domainSeparator":"cmVjbGFpbQ==","output":"FBXe6ou2AwQAvPtuC8n5To+FCa7mCp5ZR8dSO9Llb1E=","responses":[{"index":0,"publicKeyShare":"qTqvq7qLESz+y4hB7SPuN8cTmOE682R1u+jcv5YrUxo=","evaluated":"SEL2SkU0HiY3PhMZngCSsix1LQlbxEyD5ePBNiClJDA=","c":"L8I++RNA9so/KelQsb9T89WEyUpKpuBVsDbK+nFmlLg=","r":"3bCmCfYnIXpZIWafKl1JaiuDFCFrPR/SBiiItOXY9w=="},{"index":1,"publicKeyShare":"dagTfVg0fN9Dhgo1LOv2Jl16DQBixcsObQVHLehzAJ4=","evaluated":"XFcDXx227obXnM9daBLsrPSbqvvIpZzNS74NUUxog5M=","c":"JIw5UKl7K/RAzDh8oCr+i9TRDxuaFSjA3fkxg8DbFhU=","r":"A7Zn+ldkfjyqr8Mw4w4czObZPDCxPWoXHfxCspp8IxY="}]}}`
-		res := prover.Prove([]byte(params))
-		assert.NotNil(res)
-		wg.Done()
-	}()
-
-	wg.Wait()
-
-	assert.Equal(3, len(proofs))
-
-	for _, proof := range proofs {
-		assert.True(verifier.Verify(proof))
-	}
+	assert.True(prover.InitAlgorithm(prover.CHACHA20_OPRF, chachaOprfKey, chachaOprfr1cs))
+	assert.True(prover.InitAlgorithm(prover.AES_128_OPRF, aes128OprfKey, aes128Oprfr1cs))
+	assert.True(prover.InitAlgorithm(prover.AES_256_OPRF, aes256OprfKey, aes256Oprfr1cs))
 }
 
 func TestPanic(t *testing.T) {
@@ -224,7 +113,7 @@ func TestFullAES256(t *testing.T) {
 	assert.True(prover.InitAlgorithm(prover.AES_256, aes256Key, aes256r1cs))
 	bKey := make([]byte, 32)
 	bNonce := make([]byte, 12)
-	bPt := make([]byte, 64)
+	bPt := make([]byte, aes_v2.BLOCKS*16)
 	tmp, _ := rand.Int(rand.Reader, big.NewInt(math.MaxUint32))
 	counter := uint32(tmp.Uint64())
 
@@ -268,7 +157,7 @@ func TestFullAES128(t *testing.T) {
 	assert.True(prover.InitAlgorithm(prover.AES_128, aes128Key, aes128r1cs))
 	bKey := make([]byte, 16)
 	bNonce := make([]byte, 12)
-	bPt := make([]byte, 64)
+	bPt := make([]byte, aes_v2.BLOCKS*16)
 	tmp, _ := rand.Int(rand.Reader, big.NewInt(math.MaxUint32))
 	counter := uint32(tmp.Uint64())
 
@@ -323,6 +212,9 @@ func TestFullChaCha20OPRF(t *testing.T) {
 
 	email := "test@email.com"
 	domainSeparator := "reclaim"
+
+	emailBytes := []byte(email)
+
 	pos := uint32(59)
 	copy(bOutput[pos:], email)
 
@@ -338,8 +230,7 @@ func TestFullChaCha20OPRF(t *testing.T) {
 	nodes := threshold + 1
 
 	tParams := &oprf.InputGenerateParams{
-		Total:     uint8(nodes),
-		Threshold: uint8(threshold),
+		Total: uint8(nodes),
 	}
 
 	btParams, err := json.Marshal(tParams)
@@ -351,7 +242,7 @@ func TestFullChaCha20OPRF(t *testing.T) {
 	err = json.Unmarshal(bShares, &shares)
 	assert.NoError(err)
 
-	req, err := utils.OPRFGenerateRequest(email, domainSeparator)
+	req, err := utils.OPRFGenerateRequest(emailBytes, domainSeparator)
 	assert.NoError(err)
 
 	// TOPRF requests
@@ -420,7 +311,288 @@ func TestFullChaCha20OPRF(t *testing.T) {
 			R:              r.R,
 		}
 	}
-	oprfParams := &verifier.InputChachaTOPRFParams{
+	oprfParams := &verifier.InputTOPRFParams{
+		Nonce:   bNonce,
+		Counter: counter,
+		Input:   bInput,
+		TOPRF: &verifier.TOPRFParams{
+			Pos:             pos,
+			Len:             uint32(len([]byte(email))),
+			DomainSeparator: []byte(domainSeparator),
+			Output:          out.Bytes(),
+			Responses:       verifyResponses,
+		},
+	}
+
+	publicSignals, err := json.Marshal(oprfParams)
+	assert.NoError(err)
+
+	inParams := &verifier.InputVerifyParams{
+		Cipher:        inputParams.Cipher,
+		Proof:         outParams.Proof.ProofJson,
+		PublicSignals: publicSignals,
+	}
+	inBuf, _ := json.Marshal(inParams)
+	assert.True(verifier.Verify(inBuf))
+}
+
+func TestFullAES128OPRF(t *testing.T) {
+	assert := test.NewAssert(t)
+	assert.True(prover.InitAlgorithm(prover.AES_128_OPRF, aes128OprfKey, aes128Oprfr1cs))
+	bKey := make([]byte, 16)
+	bNonce := make([]byte, 12)
+	bOutput := make([]byte, aes_v2.BLOCKS*16) // circuit output is plaintext
+	bInput := make([]byte, aes_v2.BLOCKS*16)
+	tmp, _ := rand.Int(rand.Reader, big.NewInt(math.MaxUint32))
+	counter := uint32(tmp.Uint64())
+
+	rand.Read(bKey)
+	rand.Read(bNonce)
+	rand.Read(bOutput)
+
+	email := "test@email.com"
+	domainSeparator := "reclaim"
+
+	emailBytes := []byte(email)
+
+	pos := uint32(12)
+	copy(bOutput[pos:], email)
+
+	block, err := aes.NewCipher(bKey)
+	if err != nil {
+		panic(err)
+	}
+	ctr := cipher.NewCTR(block, append(bNonce, binary.BigEndian.AppendUint32(nil, counter)...))
+	ctr.XORKeyStream(bInput, bOutput)
+
+	// TOPRF setup
+
+	threshold := toprf.Threshold
+	nodes := threshold + 1
+
+	tParams := &oprf.InputGenerateParams{
+		Total: uint8(nodes),
+	}
+
+	btParams, err := json.Marshal(tParams)
+	assert.NoError(err)
+
+	bShares := oprf.TOPRFGenerateThresholdKeys(btParams)
+
+	var shares *oprf.OutputGenerateParams
+	err = json.Unmarshal(bShares, &shares)
+	assert.NoError(err)
+
+	req, err := utils.OPRFGenerateRequest(emailBytes, domainSeparator)
+	assert.NoError(err)
+
+	// TOPRF requests
+	idxs := utils.PickRandomIndexes(nodes, threshold)
+
+	responses := make([]*prover.TOPRFResponse, threshold)
+
+	for i := 0; i < threshold; i++ {
+		sk := new(big.Int).SetBytes(shares.Shares[idxs[i]].PrivateKey)
+		evalResult, err := utils.OPRFEvaluate(sk, req.MaskedData)
+		assert.NoError(err)
+
+		resp := &prover.TOPRFResponse{
+			Index:          uint8(idxs[i]),
+			PublicKeyShare: shares.Shares[idxs[i]].PublicKey,
+			Evaluated:      evalResult.EvaluatedPoint.Marshal(),
+			C:              evalResult.C.Bytes(),
+			R:              evalResult.R.Bytes(),
+		}
+		responses[i] = resp
+	}
+
+	elements := make([]*twistededwards.PointAffine, threshold)
+	for i := 0; i < threshold; i++ {
+		elements[i] = &twistededwards.PointAffine{}
+		err = elements[i].Unmarshal(responses[i].Evaluated)
+		assert.NoError(err)
+	}
+
+	out, err := utils.TOPRFFinalize(idxs, elements, req.SecretElements, req.Mask)
+	assert.NoError(err)
+
+	inputParams := &prover.InputParams{
+		Cipher:  "aes-128-ctr-toprf",
+		Key:     bKey,
+		Nonce:   bNonce,
+		Counter: counter,
+		Input:   bInput,
+		TOPRF: &prover.TOPRFParams{
+			Pos:             pos,
+			Len:             uint32(len([]byte(email))),
+			Mask:            req.Mask.Bytes(),
+			DomainSeparator: []byte(domainSeparator),
+			Output:          out.Bytes(),
+			Responses:       responses,
+		},
+	}
+
+	buf, err := json.Marshal(inputParams)
+	assert.NoError(err)
+
+	res := prover.Prove(buf)
+	assert.True(len(res) > 0)
+	var outParams *prover.OutputParams
+	err = json.Unmarshal(res, &outParams)
+	assert.NoError(err)
+
+	verifyResponses := make([]*verifier.TOPRFResponse, threshold)
+	for i := 0; i < threshold; i++ {
+		r := responses[i]
+		verifyResponses[i] = &verifier.TOPRFResponse{
+			Index:          r.Index,
+			PublicKeyShare: r.PublicKeyShare,
+			Evaluated:      r.Evaluated,
+			C:              r.C,
+			R:              r.R,
+		}
+	}
+	oprfParams := &verifier.InputTOPRFParams{
+		Nonce:   bNonce,
+		Counter: counter,
+		Input:   bInput,
+		TOPRF: &verifier.TOPRFParams{
+			Pos:             pos,
+			Len:             uint32(len([]byte(email))),
+			DomainSeparator: []byte(domainSeparator),
+			Output:          out.Bytes(),
+			Responses:       verifyResponses,
+		},
+	}
+
+	publicSignals, err := json.Marshal(oprfParams)
+	assert.NoError(err)
+
+	inParams := &verifier.InputVerifyParams{
+		Cipher:        inputParams.Cipher,
+		Proof:         outParams.Proof.ProofJson,
+		PublicSignals: publicSignals,
+	}
+	inBuf, _ := json.Marshal(inParams)
+	assert.True(verifier.Verify(inBuf))
+}
+func TestFullAES256OPRF(t *testing.T) {
+	assert := test.NewAssert(t)
+	assert.True(prover.InitAlgorithm(prover.AES_256_OPRF, aes256OprfKey, aes256Oprfr1cs))
+	bKey := make([]byte, 32)
+	bNonce := make([]byte, 12)
+	bOutput := make([]byte, aes_v2.BLOCKS*16) // circuit output is plaintext
+	bInput := make([]byte, aes_v2.BLOCKS*16)
+	tmp, _ := rand.Int(rand.Reader, big.NewInt(math.MaxUint32))
+	counter := uint32(tmp.Uint64())
+
+	rand.Read(bKey)
+	rand.Read(bNonce)
+	rand.Read(bOutput)
+
+	email := "test@email.com"
+	domainSeparator := "reclaim"
+
+	emailBytes := []byte(email)
+
+	pos := uint32(12)
+	copy(bOutput[pos:], email)
+
+	block, err := aes.NewCipher(bKey)
+	if err != nil {
+		panic(err)
+	}
+	ctr := cipher.NewCTR(block, append(bNonce, binary.BigEndian.AppendUint32(nil, counter)...))
+	ctr.XORKeyStream(bInput, bOutput)
+
+	// TOPRF setup
+
+	threshold := toprf.Threshold
+	nodes := threshold + 1
+
+	tParams := &oprf.InputGenerateParams{
+		Total: uint8(nodes),
+	}
+
+	btParams, err := json.Marshal(tParams)
+	assert.NoError(err)
+
+	bShares := oprf.TOPRFGenerateThresholdKeys(btParams)
+
+	var shares *oprf.OutputGenerateParams
+	err = json.Unmarshal(bShares, &shares)
+	assert.NoError(err)
+
+	req, err := utils.OPRFGenerateRequest(emailBytes, domainSeparator)
+	assert.NoError(err)
+
+	// TOPRF requests
+	idxs := utils.PickRandomIndexes(nodes, threshold)
+
+	responses := make([]*prover.TOPRFResponse, threshold)
+
+	for i := 0; i < threshold; i++ {
+		sk := new(big.Int).SetBytes(shares.Shares[idxs[i]].PrivateKey)
+		evalResult, err := utils.OPRFEvaluate(sk, req.MaskedData)
+		assert.NoError(err)
+
+		resp := &prover.TOPRFResponse{
+			Index:          uint8(idxs[i]),
+			PublicKeyShare: shares.Shares[idxs[i]].PublicKey,
+			Evaluated:      evalResult.EvaluatedPoint.Marshal(),
+			C:              evalResult.C.Bytes(),
+			R:              evalResult.R.Bytes(),
+		}
+		responses[i] = resp
+	}
+
+	elements := make([]*twistededwards.PointAffine, threshold)
+	for i := 0; i < threshold; i++ {
+		elements[i] = &twistededwards.PointAffine{}
+		err = elements[i].Unmarshal(responses[i].Evaluated)
+		assert.NoError(err)
+	}
+
+	out, err := utils.TOPRFFinalize(idxs, elements, req.SecretElements, req.Mask)
+	assert.NoError(err)
+
+	inputParams := &prover.InputParams{
+		Cipher:  "aes-256-ctr-toprf",
+		Key:     bKey,
+		Nonce:   bNonce,
+		Counter: counter,
+		Input:   bInput,
+		TOPRF: &prover.TOPRFParams{
+			Pos:             pos,
+			Len:             uint32(len([]byte(email))),
+			Mask:            req.Mask.Bytes(),
+			DomainSeparator: []byte(domainSeparator),
+			Output:          out.Bytes(),
+			Responses:       responses,
+		},
+	}
+
+	buf, err := json.Marshal(inputParams)
+	assert.NoError(err)
+
+	res := prover.Prove(buf)
+	assert.True(len(res) > 0)
+	var outParams *prover.OutputParams
+	err = json.Unmarshal(res, &outParams)
+	assert.NoError(err)
+
+	verifyResponses := make([]*verifier.TOPRFResponse, threshold)
+	for i := 0; i < threshold; i++ {
+		r := responses[i]
+		verifyResponses[i] = &verifier.TOPRFResponse{
+			Index:          r.Index,
+			PublicKeyShare: r.PublicKeyShare,
+			Evaluated:      r.Evaluated,
+			C:              r.C,
+			R:              r.R,
+		}
+	}
+	oprfParams := &verifier.InputTOPRFParams{
 		Nonce:   bNonce,
 		Counter: counter,
 		Input:   bInput,
@@ -448,7 +620,7 @@ func TestFullChaCha20OPRF(t *testing.T) {
 func Benchmark_ProveAES128(b *testing.B) {
 	prover.InitAlgorithm(prover.AES_128, aes128Key, aes128r1cs)
 	b.ResetTimer()
-	params := `{"cipher":"aes-128-ctr","key":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],"nonce":[3,3,3,3,3,3,3,3,3,3,3,3],"counter":2,"input":[183,4,206,60,254,21,117,9,150,227,246,245,71,101,56,67,79,93,44,163,22,89,128,55,214,254,228,214,89,253,176,112,138,115,93,140,194,222,104,252,49,144,91,252,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}`
+	params := `{"cipher":"aes-128-ctr","key":"Ilqk8vMs/lrdrt9bEpM3qQ==","nonce":"/T8j2un1mcMh0Lt4","counter":298071680,"input":"mBiZrxJnp1ALlddPWenBt12YsVzSMFudhjbMC9rZtx//D0LMi5R8+/bzkKZgTaoxy3N0Gdgf5//U7kObAKBNE3votSHtiNhZUUZsoUvD5fw="}`
 	for i := 0; i < b.N; i++ {
 		prover.Prove([]byte(params))
 	}
@@ -458,7 +630,7 @@ func Benchmark_ProveAES128(b *testing.B) {
 func Benchmark_ProveAES256(b *testing.B) {
 	prover.InitAlgorithm(prover.AES_256, aes256Key, aes256r1cs)
 	b.ResetTimer()
-	params := `{"cipher":"aes-256-ctr","key":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],"nonce":[3,3,3,3,3,3,3,3,3,3,3,3],"counter":10,"input":[189,250,225,242,6,46,173,203,7,166,62,139,67,150,1,155,64,122,211,198,184,203,124,194,99,34,127,29,236,17,232,214,154,146,78,217,254,224,208,196,55,200,23,93,90,175,240,31,31,225,26,15,219,156,123,21,103,98,205,87,197,22,245,158]}`
+	params := `{"cipher":"aes-256-ctr","key":"D90Byc5KBESfgf52T5T+VbKIR56UCldsfD/k3QRq1FU=","nonce":"xaPdohzb+eNGkzhl","counter":2841725616,"input":"l4nng90p9WsrHCVYqIB0UoBPEOnZxigJ7qSGTRMU5nEgrXO7CpqmQov0p4eZ4bKJI3SvpgQ2jxqu+FJDjzINA9aI72YcXf4AYGtI8+sl/Ig="}`
 	for i := 0; i < b.N; i++ {
 		prover.Prove([]byte(params))
 	}
@@ -468,7 +640,37 @@ func Benchmark_ProveAES256(b *testing.B) {
 func Benchmark_ProveChacha(b *testing.B) {
 	prover.InitAlgorithm(prover.CHACHA20, chachaKey, chachaR1CS)
 	b.ResetTimer()
-	params := `{"cipher":"chacha20","key":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],"nonce":[3,3,3,3,3,3,3,3,3,3,3,3],"counter":3,"input":[163,247,229,146,174,218,21,7,167,245,27,53,129,45,252,80,162,99,213,166,210,223,98,94,86,59,2,228,156,8,191,48,208,231,72,63,91,19,255,7,149,50,34,78,232,251,195,26,177,137,155,24,228,83,211,109,151,147,168,53,94,176,222,233]}`
+	params := `{"cipher":"chacha20","key":"DAKfm7e+mFt0cCGacGmnDm5fVZ7UWyv7O53J27yePbs=","nonce":"I3zQZE9P8e7lXG6a","counter":1757507854,"input":"ShLAJduinXP+uOyxYoFNcUzR4c59QbcFed8YlIBPD3yRJhrVwB06tAIfP0TC2AUMztD7q60vAsK/at+WI9U0+fsgNDLhqI912HvyE1oUFm5XHpTC5VtVg1p0N4/ZjXaa7Wd9sWc2ty5eP8lEjGVzyRX6Goi+vygtkwh/1qJRc/I="}`
+	for i := 0; i < b.N; i++ {
+		prover.Prove([]byte(params))
+	}
+	b.ReportAllocs()
+}
+
+func Benchmark_ProveAES128OPRF(b *testing.B) {
+	prover.InitAlgorithm(prover.AES_128_OPRF, aes128OprfKey, aes128Oprfr1cs)
+	b.ResetTimer()
+	params := `{"cipher":"aes-128-ctr-toprf","key":"ZAWxNb2AdgO39yzI14XsZA==","nonce":"LBsTWdRfQ2J7unF2","counter":2260824246,"input":"UTnKUAkCBrEYiC2tPMnGliYTdcbVFXrFhFRH3m3N5zl5XUhfljrNTdquVVeL2PleSc3w5m2ZI6kVePRaC/OWC8tQjwk4n7WpB8D4IpqQHSU=","toprf":{"pos":12,"len":14,"mask":"A1BXFdPv8/KMIWHKi5ayD+Ngj2x8CEqPIXaS94kBNxg=","domainSeparator":"cmVjbGFpbQ==","output":"IShCRuW+UON6xy/va104/4qxauCxbF/boK4SjbExTMM=","responses":[{"index":0,"publicKeyShare":"n/wRU9Jw6bMF/f+IwhF3SJmBQ9IevOCcNu6HOGV7NQg=","evaluated":"KhzfVQOJZfu7tacCPV82IzgmZsl9m4g931kTPvmg16Q=","c":"LeUBWWxMeLTK201i0QcyFEguuBwHOIkgWyebJHb4KuY=","r":"ATMhm3RUePybiYqj+dGM8OssXZPpkGXVeiNdoxKHhLY="}]}}`
+	for i := 0; i < b.N; i++ {
+		prover.Prove([]byte(params))
+	}
+	b.ReportAllocs()
+}
+
+func Benchmark_ProveAES256OPRF(b *testing.B) {
+	prover.InitAlgorithm(prover.AES_256_OPRF, aes256OprfKey, aes256Oprfr1cs)
+	b.ResetTimer()
+	params := `{"cipher":"aes-256-ctr-toprf","key":"4IpME0BPXBIlVL7TdbRPktZVqqxQ+cUZaZN1ZQH+HXI=","nonce":"mMrCGydl9N4uwKxN","counter":4148389242,"input":"6DOHCarJBb8OdKf3cWakFKgn9BV/eVPQPaBlNwSRHA7GoGs6ijTygZwuBsYGbIw35q3U+OHyhD5M181U7Mx25uaFlZzbMr6xPp0LYk4YWuM=","toprf":{"pos":12,"len":14,"mask":"jiWalfzXdcn7geSk8UmfvaIzHiBo9AlhIm4mJT6qhg==","domainSeparator":"cmVjbGFpbQ==","output":"L0io3LqaeEdNSnZBJzAM46zlxZH30wxNf38cEvYWhhw=","responses":[{"index":1,"publicKeyShare":"y1wKCxI/i+OF8Nfjc9DyXmz67DtfWxk9fWnlFqTnlxs=","evaluated":"UApaFttzi54ShGcrXcpMKapa4emphZbdI3MNsKBjMpw=","c":"GWQKZ7Q54L2TjDvLtywRuD6AXt+8uvrQ+jGHuKIIpY4=","r":"A4RxrU5gOa0LMgLKhHVp4SfknOvYIIOLcWVPBwJ7zj4="}]}}`
+	for i := 0; i < b.N; i++ {
+		prover.Prove([]byte(params))
+	}
+	b.ReportAllocs()
+}
+
+func Benchmark_ProveChachaOPRF(b *testing.B) {
+	prover.InitAlgorithm(prover.CHACHA20_OPRF, chachaOprfKey, chachaOprfr1cs)
+	b.ResetTimer()
+	params := `{"cipher":"chacha20-toprf","key":"Ka3Qs7LgwGaRQwIXYSQKYF1bpKX7BntH1+gbgiMHyYM=","nonce":"yLApW3mIK0mM3uE9","counter":4168221410,"input":"zDdyXezLpcexVGYoZoyuFIDjpXZCV+YSVbDd5SfRHge7HEril7C0gnqR7dPbMwj/2t9g5mU4x/2bvl+grkeyUT33HCyRvebvAEfDkGENP5aO2MC71P7ynYGIAV7/4QbkflQRA9pdKOHfqCSEzd4GqNaaIKzF1/A6AHXuaeOOg5U=","toprf":{"pos":59,"len":14,"mask":"BIvVtZdOIiZSDWb1/sLKqoEXhx4mc4Kmv580KPbll3Q=","domainSeparator":"cmVjbGFpbQ==","output":"CUcueErhemKezndgP7vjGImvG8ua9104RJe8QhNcuOc=","responses":[{"index":0,"publicKeyShare":"0W07hZxwL42VhLULWKIkYDAuukzGBuCafqZVPTWPrq8=","evaluated":"JxObYdh6IlUR4+GV6Z1oBcWr5wEnWzuWUHX07gGQ+So=","c":"FUBwJawrBPQe3OJs6zLj4vpz2SEG4AU1Q6ucXIZrCyM=","r":"A8NG/ewWaCAef6Mowvq4XTgVtRRcRvaD6edkrsirUOw="}]}}`
 	for i := 0; i < b.N; i++ {
 		prover.Prove([]byte(params))
 	}

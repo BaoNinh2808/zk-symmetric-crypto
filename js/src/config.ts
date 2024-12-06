@@ -4,7 +4,7 @@ import { AlgorithmConfig, EncryptionAlgorithm } from './types'
 import { bitsToUint8Array, bitsToUintArray, toUint8Array, toUintArray, uint8ArrayToBits, uintArrayToBits } from './utils'
 
 // commit hash for this repo
-export const GIT_COMMIT_HASH = 'd82fab41fa4033aa13feda3374f80a9df7af52b2'
+export const GIT_COMMIT_HASH = '4ed20b2244b4f701d3b07eaa7af8e1d4c58186c8'
 
 export const CONFIG: { [E in EncryptionAlgorithm]: AlgorithmConfig } = {
 	'chacha20': {
@@ -33,13 +33,13 @@ export const CONFIG: { [E in EncryptionAlgorithm]: AlgorithmConfig } = {
 	},
 	'aes-256-ctr': {
 		index: 2,
-		chunkSize: 64,
+		chunkSize: 80,
 		bitsPerWord: 8,
 		keySizeBytes: 32,
 		ivSizeBytes: 12,
 		startCounter: 2,
 		// num of blocks per chunk
-		blocksPerChunk: 4,
+		blocksPerChunk: 5,
 		// AES circuit uses BE encoding
 		isLittleEndian: false,
 		uint8ArrayToBits,
@@ -48,13 +48,13 @@ export const CONFIG: { [E in EncryptionAlgorithm]: AlgorithmConfig } = {
 	},
 	'aes-128-ctr': {
 		index: 1,
-		chunkSize: 64,
+		chunkSize: 80,
 		bitsPerWord: 8,
 		keySizeBytes: 16,
 		ivSizeBytes: 12,
 		startCounter: 2,
 		// num of blocks per chunk
-		blocksPerChunk: 4,
+		blocksPerChunk: 5,
 		// AES circuit uses BE encoding
 		isLittleEndian: false,
 		uint8ArrayToBits,

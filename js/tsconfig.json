@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
-    "target": "es2018",
+    "target": "ESNext",
     "module": "commonjs",
+    "moduleResolution": "node",
     "allowJs": true,
     "checkJs": false,
     "outDir": "lib",
@@ -16,7 +17,8 @@
     "lib": [ "es2020", "DOM" ]
   },
   "include": [
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "src/**/*.js"
   ],
   "exclude": [
     "node_modules"

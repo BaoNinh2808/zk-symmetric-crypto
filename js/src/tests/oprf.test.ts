@@ -1,91 +1,113 @@
+import { CONFIG } from '../config'
 import { makeLocalFileFetch } from '../file-fetch'
 import { makeGnarkOPRFOperator } from '../gnark/toprf'
-import { TOPRFResponseData } from '../gnark/types'
-import { ZKTOPRFPublicSignals } from '../types'
+import { strToUint8Array } from '../gnark/utils'
+import { EncryptionAlgorithm, OPRFOperator, OPRFResponseData, ZKEngine, ZKTOPRFPublicSignals } from '../types'
 import { generateProof, verifyProof } from '../zk'
 import { encryptData } from './utils'
 
+jest.setTimeout(10_000)
+
 const fetcher = makeLocalFileFetch()
-const operator = makeGnarkOPRFOperator({ fetcher, algorithm: 'chacha20' })
+const threshold = 1
 
-describe('TOPRF circuits Tests', () => {
+const POSITIONS = [
+	0,
+	10
+]
 
-	it('should prove & verify TOPRF', async() => {
-		const email = 'test@email.com'
-		const domainSeparator = 'reclaim'
-		const threshold = 2
+type Config = {
+	make: (alg: EncryptionAlgorithm) => OPRFOperator
+	algorithms: EncryptionAlgorithm[]
+}
 
-		const keys = await operator.generateThresholdKeys(3, threshold)
-		const req = await operator
-			.generateOPRFRequestData(email, domainSeparator)
+const OPRF_ZK_ENGINES_MAP: { [E in ZKEngine]?: Config } = {
+	'gnark': {
+		make: algorithm => makeGnarkOPRFOperator({ fetcher, algorithm }),
+		algorithms: ['chacha20', 'aes-128-ctr', 'aes-256-ctr'],
+	}
+}
 
-		const resps: TOPRFResponseData[] = []
-		for(let i = 0; i < threshold; i++) {
-			const evalResult = await operator.evaluateOPRF(
-				keys.shares[i].privateKey,
-				req.maskedData
-			)
+const OPRF_ENGINES = Object.keys(OPRF_ZK_ENGINES_MAP) as ZKEngine[]
 
-			const resp = {
-				index: i,
-				publicKeyShare: keys.shares[i].publicKey,
-				evaluated: evalResult.evaluated,
-				c: evalResult.c,
-				r: evalResult.r,
+describe.each(OPRF_ENGINES)('%s TOPRF circuits Tests', engine => {
+
+	const { make, algorithms } = OPRF_ZK_ENGINES_MAP[engine]!
+
+	describe.each(algorithms)('%s', algorithm => {
+
+		const operator = make(algorithm)
+
+		it.each(POSITIONS)('should prove & verify TOPRF at pos=%s', async pos => {
+			const email = 'test@email.com'
+			const domainSeparator = 'reclaim'
+
+			const keys = await operator.generateThresholdKeys(5, threshold)
+			const req = await operator
+				.generateOPRFRequestData(strToUint8Array(email), domainSeparator)
+
+			const resps: OPRFResponseData[] = []
+			for(let i = 0; i < threshold; i++) {
+				const evalResult = await operator.evaluateOPRF(
+					keys.shares[i].privateKey,
+					req.maskedData
+				)
+
+				resps.push({
+					publicKeyShare: keys.shares[i].publicKey,
+					evaluated: evalResult.evaluated,
+					c: evalResult.c,
+					r: evalResult.r,
+				})
 			}
 
-			resps.push(resp)
-		}
+			const nullifier = await operator
+				.finaliseOPRF(keys.publicKey, req, resps)
+			const len = email.length
 
-		const nullifier = await operator
-			.finaliseOPRF(keys.publicKey, req, resps)
+			const plaintext = new Uint8Array(Buffer.alloc(64))
+			//replace part of plaintext with email
+			plaintext.set(new Uint8Array(Buffer.from(email)), pos)
 
-		const pos = 10
-		const len = email.length
+			const { keySizeBytes } = CONFIG[algorithm]
+			const key = new Uint8Array(Array.from(Array(keySizeBytes).keys()))
+			const iv = new Uint8Array(Array.from(Array(12).keys()))
 
-		const plaintext = new Uint8Array(Buffer.alloc(64))
-		//replace part of plaintext with email
-		plaintext.set(new Uint8Array(Buffer.from(email)), pos)
+			const ciphertext = encryptData(algorithm, plaintext, key, iv)
 
-		const key = new Uint8Array(Array.from(Array(32).keys()))
-		const iv = new Uint8Array(Array.from(Array(12).keys()))
+			const toprf: ZKTOPRFPublicSignals = {
+				pos: pos, //pos in plaintext
+				len: len, // length of data to "hash"
+				domainSeparator,
+				output: nullifier,
+				responses: resps
+			}
 
-		const ciphertext = encryptData('chacha20', plaintext, key, iv)
-
-		const toprf: ZKTOPRFPublicSignals = {
-			pos: pos, //pos in plaintext
-			len: len, // length of data to "hash"
-			domainSeparator,
-			output: nullifier,
-			responses: resps
-		}
-
-		const proof = await generateProof({
-			algorithm: 'chacha20',
-			privateInput: {
-				key,
-			},
-			publicInput: {
-				iv,
-				ciphertext,
-				offset: 0
-			},
-			operator,
-			mask: req.mask,
-			toprf,
-		})
-
-		await expect(
-			verifyProof({
-				proof,
+			const proof = await generateProof({
+				algorithm,
+				privateInput: {
+					key,
+				},
 				publicInput: {
 					iv,
 					ciphertext,
 					offset: 0
 				},
+				operator,
+				mask: req.mask,
 				toprf,
-				operator
 			})
-		).resolves.toBeUndefined()
+
+			await expect(
+				verifyProof({
+					proof,
+					publicInput: { iv, ciphertext,
+						offset: 0
+					},
+					toprf,
+					operator
+				})
+			).resolves.toBeUndefined()
+		})
 	})
 })

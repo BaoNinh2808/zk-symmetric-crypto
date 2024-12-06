@@ -138,9 +138,7 @@ export function serialiseGnarkWitness(
 	input: ZKProofInput | ZKProofInputOPRF | ZKProofPublicSignals | ZKProofPublicSignalsOPRF
 ) {
 	const json = generateGnarkWitness(cipher, input)
-	return strToUint8Array(JSON.stringify(
-		json
-	))
+	return strToUint8Array(JSON.stringify(json))
 }
 
 export function generateGnarkWitness(
@@ -181,10 +179,9 @@ export function generateGnarkWitness(
 }
 
 function mapResponse({
-	index, publicKeyShare, evaluated, c, r
+	publicKeyShare, evaluated, c, r
 }: ZKTOPRFResponsePublicSignals) {
 	return {
-		index,
 		publicKeyShare: Base64.fromUint8Array(publicKeyShare),
 		evaluated: Base64.fromUint8Array(evaluated),
 		c: Base64.fromUint8Array(c),
